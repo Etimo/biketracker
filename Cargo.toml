@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
 
 [dependencies]
+blurz = "0.4.0"
