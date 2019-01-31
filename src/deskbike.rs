@@ -1,23 +1,26 @@
-use blurz::bluetooth_session::BluetoothSession;
 use blurz::bluetooth_adapter::BluetoothAdapter;
 use blurz::bluetooth_device::BluetoothDevice;
-use blurz::bluetooth_event::BluetoothEvent;
 use blurz::bluetooth_discovery_session::BluetoothDiscoverySession;
-use blurz::bluetooth_gatt_service::BluetoothGATTService;
+use blurz::bluetooth_event::BluetoothEvent;
 use blurz::bluetooth_gatt_characteristic::BluetoothGATTCharacteristic;
+use blurz::bluetooth_gatt_service::BluetoothGATTService;
+use blurz::bluetooth_session::BluetoothSession;
 use dbus;
-use std::error::Error;
 use failure::{Fail, ResultExt};
-// use packed_struct::prelude::*;
-// // use packed_struct::packing::packing_slice;
-// use packed_struct_codegen::PackedStruct;
+use std::error::Error;
 
 static DESKBIKE_ALIAS_PREFIX: &'static str = "deskbike";
 
-static BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE: &'static str = "00001816-0000-1000-8000-00805f9b34fb";
-static BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT: &'static str = "00002a5b-0000-1000-8000-00805f9b34fb";
+static BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE: &'static str =
+    "00001816-0000-1000-8000-00805f9b34fb";
+static BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT: &'static str =
+    "00002a5b-0000-1000-8000-00805f9b34fb";
 
-fn bluetooth_get_service_by_uuid<'s>(session: &'s BluetoothSession, device: &BluetoothDevice, service_uuid: &str) -> Result<Option<BluetoothGATTService<'s>>, Box<dyn Error>> {
+fn bluetooth_get_service_by_uuid<'s>(
+    session: &'s BluetoothSession,
+    device: &BluetoothDevice,
+    service_uuid: &str,
+) -> Result<Option<BluetoothGATTService<'s>>, Box<dyn Error>> {
     for path in device.get_gatt_services()? {
         let service = BluetoothGATTService::new(&session, path);
         if service.get_uuid()? == service_uuid {
@@ -27,7 +30,11 @@ fn bluetooth_get_service_by_uuid<'s>(session: &'s BluetoothSession, device: &Blu
     Ok(None)
 }
 
-fn bluetooth_get_characteristic_by_uuid<'s>(session: &'s BluetoothSession, service: &BluetoothGATTService, characteristic_uuid: &str) -> Result<Option<BluetoothGATTCharacteristic<'s>>, Box<dyn Error>> {
+fn bluetooth_get_characteristic_by_uuid<'s>(
+    session: &'s BluetoothSession,
+    service: &BluetoothGATTService,
+    characteristic_uuid: &str,
+) -> Result<Option<BluetoothGATTCharacteristic<'s>>, Box<dyn Error>> {
     for path in service.get_gatt_characteristics()? {
         let characteristic = BluetoothGATTCharacteristic::new(&session, path);
         if characteristic.get_uuid()? == characteristic_uuid {
@@ -40,17 +47,17 @@ fn bluetooth_get_characteristic_by_uuid<'s>(session: &'s BluetoothSession, servi
 #[derive(Debug, Fail)]
 pub enum DeskbikeError {
     #[fail(display = "can't find CSC service on device {}", device_path)]
-    NoCscServiceOnDevice {
-        device_path: String,
-    },
-    #[fail(display = "can't find CSC measurement characteristic on service {}", service_path)]
-    NoCscMeasurementCharacteristicOnService {
-        service_path: String,
-    },
-    #[fail(display = "received an invalid CSC measurement value: {}", cause_message)]
-    InvalidCscMeasurement {
-        cause_message: String,
-    },
+    NoCscServiceOnDevice { device_path: String },
+    #[fail(
+        display = "can't find CSC measurement characteristic on service {}",
+        service_path
+    )]
+    NoCscMeasurementCharacteristicOnService { service_path: String },
+    #[fail(
+        display = "received an invalid CSC measurement value: {}",
+        cause_message
+    )]
+    InvalidCscMeasurement { cause_message: String },
 }
 
 pub struct DeskbikeSession {
@@ -65,7 +72,8 @@ impl DeskbikeSession {
         let bt_session = BluetoothSession::create_session(None)?;
         let adapter = BluetoothAdapter::init(&bt_session)?;
 
-        let discovery_session = BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
+        let discovery_session =
+            BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
         discovery_session.start_discovery()?;
 
         println!("Scanning");
@@ -87,18 +95,34 @@ impl DeskbikeSession {
                                 } else {
                                     println!("Already connected!");
                                 }
-                                let csc_service = bluetooth_get_service_by_uuid(&bt_session, &device, BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE)?.ok_or(DeskbikeError::NoCscServiceOnDevice{device_path: device.get_id()}).compat()?;
-                                let csc_measurement = bluetooth_get_characteristic_by_uuid(&bt_session, &csc_service, BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT)?.ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService{service_path: csc_service.get_id()}).compat()?;
+                                let csc_service = bluetooth_get_service_by_uuid(
+                                    &bt_session,
+                                    &device,
+                                    BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE,
+                                )?
+                                .ok_or(DeskbikeError::NoCscServiceOnDevice {
+                                    device_path: device.get_id(),
+                                })
+                                .compat()?;
+                                let csc_measurement = bluetooth_get_characteristic_by_uuid(
+                                    &bt_session,
+                                    &csc_service,
+                                    BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT,
+                                )?
+                                .ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService {
+                                    service_path: csc_service.get_id(),
+                                })
+                                .compat()?;
                                 discovery_session.stop_discovery()?;
                                 csc_measurement.start_notify()?;
                                 return Ok(DeskbikeSession {
                                     device_path: device.get_id(),
                                     csc_measurement_path: csc_measurement.get_id(),
                                     bluetooth_session: bt_session,
-                                })
+                                });
                             }
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -150,8 +174,8 @@ pub struct CscMeasurements<'a> {
 }
 
 mod parsers {
+    use super::{CscMeasurement, CscMeasurementFlags};
     use nom::*;
-    use super::{CscMeasurementFlags, CscMeasurement};
 
     named!(csc_measurement_flags(&[u8]) -> CscMeasurementFlags,
            bits!(do_parse!(
@@ -193,15 +217,13 @@ impl<'a> Iterator for CscMeasurements<'a> {
                         ref value,
                         ref object_path,
                     }) if object_path == &self.characteristic_path => {
-                        return Some(CscMeasurement::from_bytes(value))
-                    },
+                        return Some(CscMeasurement::from_bytes(value));
+                    }
                     Some(BluetoothEvent::Connected {
                         connected: false,
                         ref object_path,
-                    }) if object_path == &self.device_path => {
-                        return None
-                    },
-                    _ => {},
+                    }) if object_path == &self.device_path => return None,
+                    _ => {}
                 }
             }
         }
