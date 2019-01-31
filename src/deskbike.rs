@@ -81,8 +81,12 @@ impl DeskbikeSession {
                             let device_name = device.get_alias()?;
                             if device_name.starts_with(DESKBIKE_ALIAS_PREFIX) {
                                 println!("Connecting to {}...", device.get_alias()?);
-                                device.connect(10000)?;
-                                println!("Connected!");
+                                if !device.is_connected()? {
+                                    device.connect(10000)?;
+                                    println!("Connected!");
+                                } else {
+                                    println!("Already connected!");
+                                }
                                 let csc_service = bluetooth_get_service_by_uuid(&bt_session, &device, BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE)?.ok_or(DeskbikeError::NoCscServiceOnDevice{device_path: device.get_id()}).compat()?;
                                 let csc_measurement = bluetooth_get_characteristic_by_uuid(&bt_session, &csc_service, BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT)?.ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService{service_path: csc_service.get_id()}).compat()?;
                                 discovery_session.stop_discovery()?;
@@ -191,10 +195,15 @@ impl<'a> Iterator for CscMeasurements<'a> {
                     }) if object_path == &self.characteristic_path => {
                         return Some(CscMeasurement::from_bytes(value))
                     },
+                    Some(BluetoothEvent::Connected {
+                        connected: false,
+                        ref object_path,
+                    }) if object_path == &self.device_path => {
+                        return None
+                    },
                     _ => {},
                 }
             }
         }
-        None
     }
 }
