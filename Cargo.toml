@@ -2,6 +2,10 @@
 name = "biketracker"
 version = "0.1.0"
 authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
+edition = "2018"
 
 [dependencies]
 blurz = "0.4.0"
+dbus = "0.6.4"
+failure = "0.1.5"
+nom = "4.2.0"
