@@ -55,6 +55,8 @@ pub enum DeskbikeError {
 
 pub struct DeskbikeSession {
     bluetooth_session: BluetoothSession,
+    device_path: String,
+    csc_measurement_path: String,
 }
 
 impl DeskbikeSession {
@@ -86,6 +88,8 @@ impl DeskbikeSession {
                                 discovery_session.stop_discovery()?;
                                 csc_measurement.start_notify()?;
                                 return Ok(DeskbikeSession {
+                                    device_path: device.get_id(),
+                                    csc_measurement_path: csc_measurement.get_id(),
                                     bluetooth_session: bt_session,
                                 })
                             }
@@ -100,6 +104,8 @@ impl DeskbikeSession {
     pub fn measurements(&mut self) -> CscMeasurements {
         CscMeasurements {
             incoming_dbus: self.bluetooth_session.incoming(100),
+            device_path: self.device_path.clone(),
+            characteristic_path: self.csc_measurement_path.clone(),
         }
     }
 }
@@ -135,6 +141,8 @@ impl CscMeasurement {
 
 pub struct CscMeasurements<'a> {
     incoming_dbus: dbus::ConnMsgs<&'a dbus::Connection>,
+    device_path: String,
+    characteristic_path: String,
 }
 
 mod parsers {
@@ -178,10 +186,10 @@ impl<'a> Iterator for CscMeasurements<'a> {
             for msg in &mut self.incoming_dbus {
                 match BluetoothEvent::from(msg) {
                     Some(BluetoothEvent::Value {
-                        value,
-                        object_path: _,
-                    }) => {
-                        return Some(CscMeasurement::from_bytes(&value))
+                        ref value,
+                        ref object_path,
+                    }) if object_path == &self.characteristic_path => {
+                        return Some(CscMeasurement::from_bytes(value))
                     },
                     _ => {},
                 }
