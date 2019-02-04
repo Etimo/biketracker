@@ -107,11 +107,16 @@ fn find_device<'a, F>(session: &'a BluetoothSession, adapter: &BluetoothAdapter,
     for known_device in adapter.get_device_list().map_err(bt_err)? {
         let device = BluetoothDevice::new(session, known_device);
         if pred(&device) {
-            return Ok(device);
+            // return Ok(device);
+            // For some reason we sometimes fail to subscribe to devices that BlueZ already knows about
+            // Deleting them and repairing seems to work...
+            println!("Device is already known, deleting it...");
+            adapter.remove_device(device.get_id()).map_err(bt_err)?;
         }
     }
 
     // Failed to find known device, let's try to discover it
+    println!("Failed to find device, starting discovery...");
     let _disc_session = DiscoverySessionGuard::new(session, adapter);
     loop {
         for msg in session.incoming(100) {
