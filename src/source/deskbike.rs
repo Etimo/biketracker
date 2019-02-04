@@ -6,8 +6,8 @@ use blurz::bluetooth_gatt_characteristic::BluetoothGATTCharacteristic;
 use blurz::bluetooth_gatt_service::BluetoothGATTService;
 use blurz::bluetooth_session::BluetoothSession;
 use dbus;
-use failure::{Fail, ResultExt};
-use std::error::Error;
+use failure::{Fail, Error};
+use std::error::{Error as StdError};
 
 /// Wheel circumference in meters
 ///
@@ -26,10 +26,10 @@ fn bluetooth_get_service_by_uuid<'s>(
     session: &'s BluetoothSession,
     device: &BluetoothDevice,
     service_uuid: &str,
-) -> Result<Option<BluetoothGATTService<'s>>, Box<dyn Error>> {
-    for path in device.get_gatt_services()? {
+) -> Result<Option<BluetoothGATTService<'s>>, DeskbikeError> {
+    for path in device.get_gatt_services().map_err(bt_err)? {
         let service = BluetoothGATTService::new(&session, path);
-        if service.get_uuid()? == service_uuid {
+        if service.get_uuid().map_err(bt_err)? == service_uuid {
             return Ok(Some(service));
         }
     }
@@ -40,10 +40,10 @@ fn bluetooth_get_characteristic_by_uuid<'s>(
     session: &'s BluetoothSession,
     service: &BluetoothGATTService,
     characteristic_uuid: &str,
-) -> Result<Option<BluetoothGATTCharacteristic<'s>>, Box<dyn Error>> {
-    for path in service.get_gatt_characteristics()? {
+) -> Result<Option<BluetoothGATTCharacteristic<'s>>, DeskbikeError> {
+    for path in service.get_gatt_characteristics().map_err(bt_err)? {
         let characteristic = BluetoothGATTCharacteristic::new(&session, path);
-        if characteristic.get_uuid()? == characteristic_uuid {
+        if characteristic.get_uuid().map_err(bt_err)? == characteristic_uuid {
             return Ok(Some(characteristic));
         }
     }
@@ -52,6 +52,11 @@ fn bluetooth_get_characteristic_by_uuid<'s>(
 
 #[derive(Debug, Fail)]
 pub enum DeskbikeError {
+    #[fail(display = "bluetooth error: {}", cause)]
+    BluetoothError {
+        #[fail(cause)]
+        cause: Error,
+    },
     #[fail(display = "can't find CSC service on device {}", device_path)]
     NoCscServiceOnDevice { device_path: String },
     #[fail(
@@ -66,6 +71,12 @@ pub enum DeskbikeError {
     InvalidCscMeasurement { cause_message: String },
 }
 
+fn bt_err(inner: Box<dyn StdError + Send + Sync>) -> DeskbikeError {
+    DeskbikeError::BluetoothError {
+        cause: Error::from_boxed_compat(inner),
+    }
+}
+
 pub struct DeskbikeSession {
     bluetooth_session: BluetoothSession,
     device_path: String,
@@ -73,14 +84,14 @@ pub struct DeskbikeSession {
 }
 
 impl DeskbikeSession {
-    pub fn connect() -> Result<DeskbikeSession, Box<dyn Error>> {
+    pub fn connect() -> Result<DeskbikeSession, DeskbikeError> {
         println!("Setting up bluetooth");
-        let bt_session = BluetoothSession::create_session(None)?;
-        let adapter = BluetoothAdapter::init(&bt_session)?;
+        let bt_session = BluetoothSession::create_session(None).map_err(bt_err)?;
+        let adapter = BluetoothAdapter::init(&bt_session).map_err(bt_err)?;
 
         let discovery_session =
-            BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
-        discovery_session.start_discovery()?;
+            BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id()).map_err(bt_err)?;
+        discovery_session.start_discovery().map_err(bt_err)?;
 
         println!("Scanning");
         loop {
@@ -95,11 +106,11 @@ impl DeskbikeSession {
                             connected: true,
                         } => {
                             let device = BluetoothDevice::new(&bt_session, object_path);
-                            let device_name = device.get_alias()?;
+                            let device_name = device.get_alias().map_err(bt_err)?;
                             if device_name.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX) {
-                                println!("Connecting to {}...", device.get_alias()?);
-                                if !device.is_connected()? {
-                                    device.connect(10000)?;
+                                println!("Connecting to {}...", device.get_alias().map_err(bt_err)?);
+                                if !device.is_connected().map_err(bt_err)? {
+                                    device.connect(10000).map_err(bt_err)?;
                                     println!("Connected!");
                                 } else {
                                     println!("Already connected!");
@@ -111,8 +122,7 @@ impl DeskbikeSession {
                                 )?
                                 .ok_or(DeskbikeError::NoCscServiceOnDevice {
                                     device_path: device.get_id(),
-                                })
-                                .compat()?;
+                                })?;
                                 let csc_measurement = bluetooth_get_characteristic_by_uuid(
                                     &bt_session,
                                     &csc_service,
@@ -120,10 +130,9 @@ impl DeskbikeSession {
                                 )?
                                 .ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService {
                                     service_path: csc_service.get_id(),
-                                })
-                                .compat()?;
-                                discovery_session.stop_discovery()?;
-                                csc_measurement.start_notify()?;
+                                })?;
+                                discovery_session.stop_discovery().map_err(bt_err)?;
+                                csc_measurement.start_notify().map_err(bt_err)?;
                                 return Ok(DeskbikeSession {
                                     device_path: device.get_id(),
                                     csc_measurement_path: csc_measurement.get_id(),
