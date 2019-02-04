@@ -9,7 +9,13 @@ use dbus;
 use failure::{Fail, ResultExt};
 use std::error::Error;
 
-static DESKBIKE_ALIAS_PREFIX: &'static str = "deskbike";
+/// Wheel circumference in meters
+///
+/// Rough guess based on http://www.bikecalc.com/wheel_size_math, and
+/// https://www.centurycycles.com/tips/tech-talk-know-your-tire-size-pg1275.htm
+static DESKBIKE_WHEEL_CIRCUMFERENCE_METERS: f64 = 2.14;
+
+static DESKBIKE_BLUETOOTH_ALIAS_PREFIX: &'static str = "deskbike";
 
 static BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE: &'static str =
     "00001816-0000-1000-8000-00805f9b34fb";
@@ -84,10 +90,13 @@ impl DeskbikeSession {
                         BluetoothEvent::RSSI {
                             object_path,
                             rssi: _,
+                        } | BluetoothEvent::Connected {
+                            object_path,
+                            connected: true,
                         } => {
                             let device = BluetoothDevice::new(&bt_session, object_path);
                             let device_name = device.get_alias()?;
-                            if device_name.starts_with(DESKBIKE_ALIAS_PREFIX) {
+                            if device_name.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX) {
                                 println!("Connecting to {}...", device.get_alias()?);
                                 if !device.is_connected()? {
                                     device.connect(10000)?;
@@ -128,13 +137,18 @@ impl DeskbikeSession {
             }
         }
     }
+}
 
-    pub fn measurements(&mut self) -> CscMeasurements {
-        CscMeasurements {
+impl super::BikeSession for DeskbikeSession {
+    type Measurement = CscMeasurement;
+    type MeasureError = DeskbikeError;
+
+    fn measurements<'a>(&'a mut self) -> Box<dyn Iterator<Item = Result<CscMeasurement, DeskbikeError>> + 'a> {
+        Box::new(CscMeasurements {
             incoming_dbus: self.bluetooth_session.incoming(100),
             device_path: self.device_path.clone(),
             characteristic_path: self.csc_measurement_path.clone(),
-        }
+        })
     }
 }
 
@@ -164,6 +178,12 @@ impl CscMeasurement {
                 cause_message: error.to_string(),
             }),
         }
+    }
+}
+
+impl super::BikeMeasurement for CscMeasurement {
+    fn cumulative_wheel_meters(&self) -> Option<f64> {
+        return Some(self.cumulative_wheel_revolutions? as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS);
     }
 }
 
