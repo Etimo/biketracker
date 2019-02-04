@@ -77,6 +77,60 @@ fn bt_err(inner: Box<dyn StdError + Send + Sync>) -> DeskbikeError {
     }
 }
 
+struct DiscoverySessionGuard<'a> {
+    discovery_session: BluetoothDiscoverySession<'a>,
+}
+
+impl<'a> DiscoverySessionGuard<'a> {
+    fn new(session: &'a BluetoothSession, adapter: &BluetoothAdapter) -> Result<DiscoverySessionGuard<'a>, DeskbikeError> {
+        let discovery_session = BluetoothDiscoverySession::create_session(session, adapter.get_id()).map_err(bt_err)?;
+        discovery_session.start_discovery().map_err(bt_err)?;
+        Ok(DiscoverySessionGuard {
+            discovery_session,
+        })
+    }
+}
+
+impl<'a> Drop for DiscoverySessionGuard<'a> {
+    fn drop(&mut self) {
+        // We can't return an error from Drop,
+        // but this isn't bad enough to panic! over
+        self.discovery_session.stop_discovery().unwrap_or_else(|err| println!("Failed to stop discovery: {}", err));
+    }
+}
+
+fn find_device<'a, F>(session: &'a BluetoothSession, adapter: &BluetoothAdapter, mut pred: F) -> Result<BluetoothDevice<'a>, DeskbikeError> where F: FnMut(&BluetoothDevice) -> bool {
+    for known_device in adapter.get_device_list().map_err(bt_err)? {
+        let device = BluetoothDevice::new(session, known_device);
+        if pred(&device) {
+            return Ok(device);
+        }
+    }
+
+    // Failed to find known device, let's try to discover it
+    let _disc_session = DiscoverySessionGuard::new(session, adapter);
+    loop {
+        for msg in session.incoming(100) {
+            match BluetoothEvent::from(msg) {
+                Some(BluetoothEvent::RSSI {
+                    object_path,
+                    rssi: _,
+                }) |
+                Some(BluetoothEvent::Connected {
+                    object_path,
+                    connected: true,
+                }) => {
+                    let device = BluetoothDevice::new(session, object_path);
+                    if pred(&device) {
+                        return Ok(device);
+                    }
+                },
+                _ => {}
+            }
+        }
+    }
+}
+
 pub struct DeskbikeSession {
     bluetooth_session: BluetoothSession,
     device_path: String,
@@ -89,62 +143,41 @@ impl DeskbikeSession {
         let bt_session = BluetoothSession::create_session(None).map_err(bt_err)?;
         let adapter = BluetoothAdapter::init(&bt_session).map_err(bt_err)?;
 
-        let discovery_session =
-            BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id()).map_err(bt_err)?;
-        discovery_session.start_discovery().map_err(bt_err)?;
-
         println!("Scanning");
-        loop {
-            for msg in bt_session.incoming(100) {
-                if let Some(event) = BluetoothEvent::from(msg) {
-                    match event {
-                        BluetoothEvent::RSSI {
-                            object_path,
-                            rssi: _,
-                        } | BluetoothEvent::Connected {
-                            object_path,
-                            connected: true,
-                        } => {
-                            let device = BluetoothDevice::new(&bt_session, object_path);
-                            let device_name = device.get_alias().map_err(bt_err)?;
-                            if device_name.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX) {
-                                println!("Connecting to {}...", device.get_alias().map_err(bt_err)?);
-                                if !device.is_connected().map_err(bt_err)? {
-                                    device.connect(10000).map_err(bt_err)?;
-                                    println!("Connected!");
-                                } else {
-                                    println!("Already connected!");
-                                }
-                                let csc_service = bluetooth_get_service_by_uuid(
-                                    &bt_session,
-                                    &device,
-                                    BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE,
-                                )?
-                                .ok_or(DeskbikeError::NoCscServiceOnDevice {
-                                    device_path: device.get_id(),
-                                })?;
-                                let csc_measurement = bluetooth_get_characteristic_by_uuid(
-                                    &bt_session,
-                                    &csc_service,
-                                    BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT,
-                                )?
-                                .ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService {
-                                    service_path: csc_service.get_id(),
-                                })?;
-                                discovery_session.stop_discovery().map_err(bt_err)?;
-                                csc_measurement.start_notify().map_err(bt_err)?;
-                                return Ok(DeskbikeSession {
-                                    device_path: device.get_id(),
-                                    csc_measurement_path: csc_measurement.get_id(),
-                                    bluetooth_session: bt_session,
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
+        let device = find_device(&bt_session, &adapter, |device| {
+            device.get_alias().map(|alias| alias.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX)).unwrap_or(false)
+        })?;
+        println!("Connecting to {}...", device.get_alias().map_err(bt_err)?);
+        if !device.is_connected().map_err(bt_err)? {
+            device.connect(10000).map_err(bt_err)?;
+            println!("Connected!");
+        } else {
+            println!("Already connected!");
         }
+        println!("Finding characteristic...");
+        let csc_service = bluetooth_get_service_by_uuid(
+            &bt_session,
+            &device,
+            BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE,
+        )?
+            .ok_or(DeskbikeError::NoCscServiceOnDevice {
+                device_path: device.get_id(),
+            })?;
+        let csc_measurement = bluetooth_get_characteristic_by_uuid(
+            &bt_session,
+            &csc_service,
+            BLUETOOTH_CHARACTERISTIC_CSC_MEASUREMENT,
+        )?
+            .ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService {
+                service_path: csc_service.get_id(),
+            })?;
+        println!("Subscribing...");
+        csc_measurement.start_notify().map_err(bt_err)?;
+        return Ok(DeskbikeSession {
+            device_path: device.get_id(),
+            csc_measurement_path: csc_measurement.get_id(),
+            bluetooth_session: bt_session,
+        });
     }
 }
 
