@@ -9,6 +9,8 @@ use dbus;
 use failure::{Fail, Error};
 use std::error::{Error as StdError};
 
+use super::BikeSession;
+
 /// Wheel circumference in meters
 ///
 /// Rough guess based on http://www.bikecalc.com/wheel_size_math, and
@@ -57,13 +59,15 @@ pub enum DeskbikeError {
         #[fail(cause)]
         cause: Error,
     },
-    #[fail(display = "can't find CSC service on device {}", device_path)]
+    #[fail(display = "can't find CSC service on device {} (are services done resolving?)", device_path)]
     NoCscServiceOnDevice { device_path: String },
     #[fail(
         display = "can't find CSC measurement characteristic on service {}",
         service_path
     )]
     NoCscMeasurementCharacteristicOnService { service_path: String },
+    #[fail(display = "didn't receive calibration data")]
+    NoCalibrationData,
     #[fail(
         display = "received an invalid CSC measurement value: {}",
         cause_message
@@ -135,6 +139,7 @@ pub struct DeskbikeSession {
     bluetooth_session: BluetoothSession,
     device_path: String,
     csc_measurement_path: String,
+    calibration_data: CscMeasurement,
 }
 
 impl DeskbikeSession {
@@ -155,14 +160,18 @@ impl DeskbikeSession {
             println!("Already connected!");
         }
         println!("Finding characteristic...");
-        let csc_service = bluetooth_get_service_by_uuid(
-            &bt_session,
-            &device,
-            BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE,
-        )?
-            .ok_or(DeskbikeError::NoCscServiceOnDevice {
+        let csc_service = loop {
+            match bluetooth_get_service_by_uuid(
+                &bt_session,
+                &device,
+                BLUETOOTH_SERVICE_CYCLING_SPEED_CADENCE,
+            )?.ok_or(DeskbikeError::NoCscServiceOnDevice {
                 device_path: device.get_id(),
-            })?;
+            }) {
+                Ok(csc_service) => break csc_service,
+                Err(err) => println!("{}", err)
+            }
+        };
         let csc_measurement = bluetooth_get_characteristic_by_uuid(
             &bt_session,
             &csc_service,
@@ -173,11 +182,22 @@ impl DeskbikeSession {
             })?;
         println!("Subscribing...");
         csc_measurement.start_notify().map_err(bt_err)?;
-        return Ok(DeskbikeSession {
+        let mut session = DeskbikeSession {
             device_path: device.get_id(),
             csc_measurement_path: csc_measurement.get_id(),
             bluetooth_session: bt_session,
-        });
+            calibration_data: CscMeasurement {
+                cumulative_wheel_revolutions: Some(0),
+                last_wheel_event_time: Some(0),
+                cumulative_crank_revolutions: Some(0),
+                last_crank_event_time: Some(0),
+            },
+        };
+        println!("Calibrating...");
+        let calibration_data = session.measurements().next().ok_or(DeskbikeError::NoCalibrationData)??;
+        session.calibration_data = calibration_data;
+        println!("Calibrated!");
+        return Ok(session);
     }
 }
 
@@ -190,6 +210,7 @@ impl super::BikeSession for DeskbikeSession {
             incoming_dbus: self.bluetooth_session.incoming(100),
             device_path: self.device_path.clone(),
             characteristic_path: self.csc_measurement_path.clone(),
+            calibration_data: &self.calibration_data,
         })
     }
 }
@@ -229,10 +250,31 @@ impl super::BikeMeasurement for CscMeasurement {
     }
 }
 
+fn zip_option<A, B>(one: Option<A>, two: Option<B>) -> Option<(A, B)> {
+    match (one, two) {
+        (Some(one), Some(two)) => Some((one, two)),
+        _ => None,
+    }
+}
+
+impl std::ops::Sub for &CscMeasurement {
+    type Output = CscMeasurement;
+
+    fn sub(self, other: Self) -> CscMeasurement {
+        CscMeasurement {
+            cumulative_wheel_revolutions: zip_option(self.cumulative_wheel_revolutions, other.cumulative_wheel_revolutions).map(|(one, two)| one - two),
+            last_wheel_event_time: zip_option(self.last_wheel_event_time, other.last_wheel_event_time).map(|(one, two)| one - two),
+            cumulative_crank_revolutions: zip_option(self.cumulative_crank_revolutions, other.cumulative_crank_revolutions).map(|(one, two)| one - two),
+            last_crank_event_time: zip_option(self.last_crank_event_time, other.last_crank_event_time).map(|(one, two)| one - two),
+        }
+    }
+}
+
 pub struct CscMeasurements<'a> {
     incoming_dbus: dbus::ConnMsgs<&'a dbus::Connection>,
     device_path: String,
     characteristic_path: String,
+    calibration_data: &'a CscMeasurement,
 }
 
 mod parsers {
@@ -279,7 +321,7 @@ impl<'a> Iterator for CscMeasurements<'a> {
                         ref value,
                         ref object_path,
                     }) if object_path == &self.characteristic_path => {
-                        return Some(CscMeasurement::from_bytes(value));
+                        return Some(CscMeasurement::from_bytes(value).map(|measurement| &measurement - self.calibration_data));
                     }
                     Some(BluetoothEvent::Connected {
                         connected: false,
