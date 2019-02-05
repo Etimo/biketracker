@@ -1,4 +1,8 @@
 pub mod deskbike;
+pub mod fake;
+
+pub use deskbike::Deskbike;
+pub use fake::FakeBike;
 
 /// A snapshot of the state of the bike.
 pub trait BikeMeasurement {
@@ -14,5 +18,7 @@ pub trait Bike {
     /// Continuously tracks the state of the bike.
     ///
     /// All cumulative values are relative to the state at the time of calling `measurements()`.
-    fn measurements<'a>(&'a mut self) -> Box<dyn Iterator<Item = Result<Self::Measurement, Self::MeasureError>> + 'a>;
+    fn measurements<'a>(
+        &'a mut self,
+    ) -> Box<dyn Iterator<Item = Result<Self::Measurement, Self::MeasureError>> + 'a>;
 }
