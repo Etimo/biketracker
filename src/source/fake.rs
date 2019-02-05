@@ -1,5 +1,5 @@
 use super::{Bike, BikeMeasurement};
-use std::thread;
+use std::{thread, time};
 use void::Void;
 
 /// A fake bike providing dummy data.
@@ -15,8 +15,10 @@ impl Bike for FakeBike {
     type Measurement = FakeMeasurement;
     type MeasureError = Void;
 
-    fn measurements(&mut self) -> Box<dyn Iterator<Item = Result<FakeMeasurement, Void>>> {
-        Box::new(FakeMeasurements::new())
+    fn measurements(
+        &mut self,
+    ) -> Result<Box<dyn Iterator<Item = Result<FakeMeasurement, Void>>>, Void> {
+        Ok(Box::new(FakeMeasurements::new()))
     }
 }
 
@@ -47,7 +49,7 @@ impl Iterator for FakeMeasurements {
     type Item = Result<FakeMeasurement, Void>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        thread::sleep_ms(200);
+        thread::sleep(time::Duration::from_millis(200));
         self.state.meters += 1.2;
         Some(Ok(self.state))
     }

@@ -159,7 +159,6 @@ pub struct Deskbike {
     bluetooth_session: BluetoothSession,
     device_path: String,
     csc_measurement_path: String,
-    calibration_data: CscMeasurement,
 }
 
 impl Deskbike {
@@ -206,25 +205,11 @@ impl Deskbike {
         })?;
         println!("Subscribing...");
         csc_measurement.start_notify().map_err(bt_err)?;
-        let mut session = Deskbike {
+        Ok(Deskbike {
             device_path: device.get_id(),
             csc_measurement_path: csc_measurement.get_id(),
             bluetooth_session: bt_session,
-            calibration_data: CscMeasurement {
-                cumulative_wheel_revolutions: Some(0),
-                last_wheel_event_time: Some(0),
-                cumulative_crank_revolutions: Some(0),
-                last_crank_event_time: Some(0),
-            },
-        };
-        println!("Calibrating...");
-        let calibration_data = session
-            .measurements()
-            .next()
-            .ok_or(DeskbikeError::NoCalibrationData)??;
-        session.calibration_data = calibration_data;
-        println!("Calibrated!");
-        return Ok(session);
+        })
     }
 }
 
@@ -234,13 +219,24 @@ impl Bike for Deskbike {
 
     fn measurements<'a>(
         &'a mut self,
-    ) -> Box<dyn Iterator<Item = Result<CscMeasurement, DeskbikeError>> + 'a> {
-        Box::new(CscMeasurements {
+    ) -> Result<Box<dyn Iterator<Item = Result<CscMeasurement, DeskbikeError>> + 'a>, DeskbikeError>
+    {
+        let mut iterator = CscMeasurements {
             incoming_dbus: self.bluetooth_session.incoming(100),
             device_path: self.device_path.clone(),
             characteristic_path: self.csc_measurement_path.clone(),
-            calibration_data: &self.calibration_data,
-        })
+            calibration_data: CscMeasurement {
+                cumulative_wheel_revolutions: Some(0),
+                last_wheel_event_time: Some(0),
+                cumulative_crank_revolutions: Some(0),
+                last_crank_event_time: Some(0),
+            },
+        };
+        println!("Calibrating...");
+        let calibration_data = iterator.next().ok_or(DeskbikeError::NoCalibrationData)??;
+        iterator.calibration_data = calibration_data;
+        println!("Calibrated!");
+        Ok(Box::new(iterator))
     }
 }
 
@@ -321,7 +317,7 @@ pub struct CscMeasurements<'a> {
     incoming_dbus: dbus::ConnMsgs<&'a dbus::Connection>,
     device_path: String,
     characteristic_path: String,
-    calibration_data: &'a CscMeasurement,
+    calibration_data: CscMeasurement,
 }
 
 mod parsers {
@@ -370,7 +366,7 @@ impl<'a> Iterator for CscMeasurements<'a> {
                     }) if object_path == &self.characteristic_path => {
                         return Some(
                             CscMeasurement::from_bytes(value)
-                                .map(|measurement| &measurement - self.calibration_data),
+                                .map(|measurement| &measurement - &self.calibration_data),
                         );
                     }
                     Some(BluetoothEvent::Connected {
