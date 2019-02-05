@@ -1,9 +1,9 @@
-mod source;
+pub mod source;
 
-use source::{BikeSession, BikeMeasurement};
+use source::{Bike, BikeMeasurement};
 
 fn main() {
-    let mut bike = source::deskbike::DeskbikeSession::connect().unwrap();
+    let mut bike = source::deskbike::Deskbike::connect().unwrap();
     for value in bike.measurements() {
         dbg!(value.unwrap().cumulative_wheel_meters());
     }

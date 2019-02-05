@@ -9,7 +9,7 @@ use dbus;
 use failure::{Fail, Error};
 use std::error::{Error as StdError};
 
-use super::BikeSession;
+use super::Bike;
 
 /// Wheel circumference in meters
 ///
@@ -140,15 +140,15 @@ fn find_device<'a, F>(session: &'a BluetoothSession, adapter: &BluetoothAdapter,
     }
 }
 
-pub struct DeskbikeSession {
+pub struct Deskbike {
     bluetooth_session: BluetoothSession,
     device_path: String,
     csc_measurement_path: String,
     calibration_data: CscMeasurement,
 }
 
-impl DeskbikeSession {
-    pub fn connect() -> Result<DeskbikeSession, DeskbikeError> {
+impl Deskbike {
+    pub fn connect() -> Result<Deskbike, DeskbikeError> {
         println!("Setting up bluetooth");
         let bt_session = BluetoothSession::create_session(None).map_err(bt_err)?;
         let adapter = BluetoothAdapter::init(&bt_session).map_err(bt_err)?;
@@ -187,7 +187,7 @@ impl DeskbikeSession {
             })?;
         println!("Subscribing...");
         csc_measurement.start_notify().map_err(bt_err)?;
-        let mut session = DeskbikeSession {
+        let mut session = Deskbike {
             device_path: device.get_id(),
             csc_measurement_path: csc_measurement.get_id(),
             bluetooth_session: bt_session,
@@ -206,7 +206,7 @@ impl DeskbikeSession {
     }
 }
 
-impl super::BikeSession for DeskbikeSession {
+impl Bike for Deskbike {
     type Measurement = CscMeasurement;
     type MeasureError = DeskbikeError;
 
