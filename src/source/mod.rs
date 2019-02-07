@@ -19,5 +19,5 @@ pub trait Bike {
     /// All cumulative values are relative to the state at the time of calling `measurements()`.
     fn measurements<'a>(
         &'a mut self,
-    ) -> Result<Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a>, Error>;
+    ) -> Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a>;
 }

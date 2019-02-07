@@ -12,10 +12,8 @@ impl FakeBike {
 }
 
 impl Bike for FakeBike {
-    fn measurements(
-        &mut self,
-    ) -> Result<Box<dyn Iterator<Item = Result<BikeMeasurement, Error>>>, Error> {
-        Ok(Box::new(FakeMeasurements::new()))
+    fn measurements(&mut self) -> Box<dyn Iterator<Item = Result<BikeMeasurement, Error>>> {
+        Box::new(FakeMeasurements::new())
     }
 }
 

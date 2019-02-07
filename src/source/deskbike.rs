@@ -216,14 +216,13 @@ impl Deskbike {
 impl Bike for Deskbike {
     fn measurements<'a>(
         &'a mut self,
-    ) -> Result<Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a>, Error> {
-        let mut iterator = CscMeasurements {
+    ) -> Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a> {
+        Box::new(CscMeasurements {
             incoming_dbus: self.bluetooth_session.incoming(100),
             device_path: self.device_path.clone(),
             characteristic_path: self.csc_measurement_path.clone(),
             calibration_data: None,
-        };
-        Ok(Box::new(iterator))
+        })
     }
 }
 
