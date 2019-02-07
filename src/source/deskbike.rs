@@ -9,7 +9,7 @@ use dbus;
 use failure::{Error, Fail};
 use std::error::Error as StdError;
 
-use super::Bike;
+use super::{Bike, BikeMeasurement};
 
 /// Wheel circumference in meters
 ///
@@ -214,28 +214,15 @@ impl Deskbike {
 }
 
 impl Bike for Deskbike {
-    type Measurement = CscMeasurement;
-    type MeasureError = DeskbikeError;
-
     fn measurements<'a>(
         &'a mut self,
-    ) -> Result<Box<dyn Iterator<Item = Result<CscMeasurement, DeskbikeError>> + 'a>, DeskbikeError>
-    {
+    ) -> Result<Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a>, Error> {
         let mut iterator = CscMeasurements {
             incoming_dbus: self.bluetooth_session.incoming(100),
             device_path: self.device_path.clone(),
             characteristic_path: self.csc_measurement_path.clone(),
-            calibration_data: CscMeasurement {
-                cumulative_wheel_revolutions: Some(0),
-                last_wheel_event_time: Some(0),
-                cumulative_crank_revolutions: Some(0),
-                last_crank_event_time: Some(0),
-            },
+            calibration_data: None,
         };
-        println!("Calibrating...");
-        let calibration_data = iterator.next().ok_or(DeskbikeError::NoCalibrationData)??;
-        iterator.calibration_data = calibration_data;
-        println!("Calibrated!");
         Ok(Box::new(iterator))
     }
 }
@@ -269,11 +256,13 @@ impl CscMeasurement {
     }
 }
 
-impl super::BikeMeasurement for CscMeasurement {
-    fn cumulative_wheel_meters(&self) -> Option<f64> {
-        return Some(
-            self.cumulative_wheel_revolutions? as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS,
-        );
+impl From<CscMeasurement> for BikeMeasurement {
+    fn from(csc: CscMeasurement) -> Self {
+        BikeMeasurement {
+            cumulative_wheel_meters: csc
+                .cumulative_wheel_revolutions
+                .map(|revs| revs as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS),
+        }
     }
 }
 
@@ -317,7 +306,7 @@ pub struct CscMeasurements<'a> {
     incoming_dbus: dbus::ConnMsgs<&'a dbus::Connection>,
     device_path: String,
     characteristic_path: String,
-    calibration_data: CscMeasurement,
+    calibration_data: Option<CscMeasurement>,
 }
 
 mod parsers {
@@ -354,7 +343,7 @@ mod parsers {
 }
 
 impl<'a> Iterator for CscMeasurements<'a> {
-    type Item = Result<CscMeasurement, DeskbikeError>;
+    type Item = Result<BikeMeasurement, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -364,10 +353,15 @@ impl<'a> Iterator for CscMeasurements<'a> {
                         ref value,
                         ref object_path,
                     }) if object_path == &self.characteristic_path => {
-                        return Some(
-                            CscMeasurement::from_bytes(value)
-                                .map(|measurement| &measurement - &self.calibration_data),
-                        );
+                        let measurement = match CscMeasurement::from_bytes(value) {
+                            Ok(x) => x,
+                            Err(err) => return Some(Err(err.into())),
+                        };
+                        if let Some(ref calibration_data) = self.calibration_data {
+                            return Some(Ok((&measurement - &calibration_data).into()));
+                        } else {
+                            self.calibration_data = Some(measurement);
+                        }
                     }
                     Some(BluetoothEvent::Connected {
                         connected: false,

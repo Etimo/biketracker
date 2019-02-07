@@ -4,24 +4,20 @@ pub mod fake;
 pub use deskbike::Deskbike;
 pub use fake::FakeBike;
 
+use failure::Error;
+
 /// A snapshot of the state of the bike.
-pub trait BikeMeasurement {
+pub struct BikeMeasurement {
     /// The distance travelled so far in this session, measured in metres.
-    fn cumulative_wheel_meters(&self) -> Option<f64>;
+    cumulative_wheel_meters: Option<f64>,
 }
 
 /// A connection to a bike.
 pub trait Bike {
-    type Measurement: BikeMeasurement;
-    type MeasureError;
-
     /// Continuously tracks the state of the bike.
     ///
     /// All cumulative values are relative to the state at the time of calling `measurements()`.
     fn measurements<'a>(
         &'a mut self,
-    ) -> Result<
-        Box<dyn Iterator<Item = Result<Self::Measurement, Self::MeasureError>> + 'a>,
-        Self::MeasureError,
-    >;
+    ) -> Result<Box<dyn Iterator<Item = Result<BikeMeasurement, Error>> + 'a>, Error>;
 }
