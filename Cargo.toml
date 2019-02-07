@@ -12,6 +12,8 @@ dbus = "0.6.4"
 failure = "0.1.5"
 nom = "4.2.0"
 void = "1.0.2"
+tokio = "0.1.15"
+futures = "0.1.25"
 
 [dependencies.conrod]
 version = "0.61.1"
