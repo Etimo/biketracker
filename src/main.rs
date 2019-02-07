@@ -19,6 +19,9 @@ use conrod::{
 use event_loop::event_stream;
 
 use futures::prelude::*;
+use futures::sync::oneshot;
+
+use tokio::runtime::TaskExecutor;
 
 use std::process;
 
@@ -48,7 +51,7 @@ impl State {
     }
 }
 
-fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
+fn render(state: &mut State, executor: &TaskExecutor, ids: &Ids, ui: &mut UiCell) {
     match state.page {
         Page::Login => {
             widget::Text::new("Who are you?")
@@ -67,6 +70,18 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
                     .was_clicked()
                 {
+                    tokio::spawn(
+                        oneshot::spawn_fn(
+                            || {
+                                println!("Starting sleep");
+                                std::thread::sleep(std::time::Duration::from_secs(5));
+                                println!("Stopping sleep");
+                                Ok(()) as Result<(), ()>
+                            },
+                            executor,
+                        )
+                        .inspect(|_| println!("Done sleeping!")),
+                    );
                     println!("{}", CYCLISTS[item.i]);
                 }
             }
@@ -101,6 +116,9 @@ fn main() {
     .unwrap();
     ui.fonts.insert(noto_sans);
 
+    let background_task_runtime = tokio::runtime::Runtime::new().unwrap();
+    let background_task_executor = background_task_runtime.executor();
+
     let mut state = State::new();
     let main_loop = event_stream(events_loop)
         .take_while(|events| {
@@ -127,7 +145,7 @@ fn main() {
 
             let ui = &mut ui.set_widgets();
             // update_channels(&mut state);
-            render(&mut state, &ids, ui);
+            render(&mut state, &background_task_executor, &ids, ui);
             // TODO: maybe hook the file I/O into the event loop somehow?
 
             if let Some(primitives) = ui.draw_if_changed() {
@@ -142,6 +160,8 @@ fn main() {
         });
 
     tokio::runtime::current_thread::block_on_all(main_loop).unwrap();
+    tokio::runtime::current_thread::block_on_all(background_task_runtime.shutdown_on_idle())
+        .unwrap();
 
     process::exit(0);
 }
