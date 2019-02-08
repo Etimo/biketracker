@@ -7,6 +7,7 @@ pub struct FakeBike;
 
 impl FakeBike {
     pub fn new() -> FakeBike {
+        thread::sleep(time::Duration::from_millis(500));
         FakeBike
     }
 }

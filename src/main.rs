@@ -19,16 +19,20 @@ use conrod::{
 use event_loop::event_stream;
 
 use futures::prelude::*;
-use futures::sync::oneshot;
-
-use tokio::runtime::TaskExecutor;
 
 use std::process;
+
+use failure::Error;
+
+use source::{measurements_stream, BikeMeasurementStream};
 
 widget_ids! {
     struct Ids {
         login_page_header,
         login_page_user_list,
+        connecting_page_header,
+        connect_failed_page_header,
+        cycling_page_header,
     }
 }
 
@@ -37,8 +41,9 @@ static CYCLISTS: [&'static str; 3] = ["Jens", "Erik", "Johan"];
 
 enum Page {
     Login,
-    Connecting,
-    Cycling,
+    Connecting(Box<Future<Item = BikeMeasurementStream, Error = Error>>),
+    ConnectFailed(Error),
+    Cycling(BikeMeasurementStream),
 }
 
 struct State {
@@ -51,8 +56,21 @@ impl State {
     }
 }
 
-fn render(state: &mut State, executor: &TaskExecutor, ids: &Ids, ui: &mut UiCell) {
-    match state.page {
+fn update(state: &mut State) {
+    match &mut state.page {
+        Page::Login => {}
+        Page::Connecting(ref mut connect_handle) => match connect_handle.poll() {
+            Ok(Async::Ready(bike)) => state.page = Page::Cycling(bike),
+            Ok(Async::NotReady) => {}
+            Err(err) => state.page = Page::ConnectFailed(err),
+        },
+        Page::ConnectFailed(_) => {}
+        Page::Cycling(_) => {}
+    }
+}
+
+fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
+    match &state.page {
         Page::Login => {
             widget::Text::new("Who are you?")
                 .middle_of(ui.window)
@@ -70,18 +88,11 @@ fn render(state: &mut State, executor: &TaskExecutor, ids: &Ids, ui: &mut UiCell
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
                     .was_clicked()
                 {
-                    tokio::spawn(
-                        oneshot::spawn_fn(
-                            || {
-                                println!("Starting sleep");
-                                std::thread::sleep(std::time::Duration::from_secs(5));
-                                println!("Stopping sleep");
-                                Ok(()) as Result<(), ()>
-                            },
-                            executor,
-                        )
-                        .inspect(|_| println!("Done sleeping!")),
-                    );
+                    state.page = Page::Connecting(Box::new(measurements_stream(|| {
+                        Ok(source::FakeBike::new())
+                    })));
+                    // state.page = Page::Connecting(Box::new(measurements_stream(|| source::Deskbike::connect().map_err(Error::from))));
+
                     println!("{}", CYCLISTS[item.i]);
                 }
             }
@@ -89,8 +100,21 @@ fn render(state: &mut State, executor: &TaskExecutor, ids: &Ids, ui: &mut UiCell
                 scrollbar.set(ui);
             }
         }
-        Page::Connecting => unreachable!(),
-        Page::Cycling => unreachable!(),
+        Page::Connecting(_) => {
+            widget::Text::new("Connecting...")
+                .middle_of(ui.window)
+                .color(conrod::color::WHITE)
+                .font_size(32)
+                .set(ids.connecting_page_header, ui);
+        }
+        Page::ConnectFailed(_) => unreachable!(),
+        Page::Cycling(_bike) => {
+            widget::Text::new("Connected!")
+                .middle_of(ui.window)
+                .color(conrod::color::WHITE)
+                .font_size(32)
+                .set(ids.cycling_page_header, ui);
+        }
     }
 }
 
@@ -115,9 +139,6 @@ fn main() {
     )
     .unwrap();
     ui.fonts.insert(noto_sans);
-
-    let background_task_runtime = tokio::runtime::Runtime::new().unwrap();
-    let background_task_executor = background_task_runtime.executor();
 
     let mut state = State::new();
     let main_loop = event_stream(events_loop)
@@ -144,9 +165,8 @@ fn main() {
             }
 
             let ui = &mut ui.set_widgets();
-            // update_channels(&mut state);
-            render(&mut state, &background_task_executor, &ids, ui);
-            // TODO: maybe hook the file I/O into the event loop somehow?
+            update(&mut state);
+            render(&mut state, &ids, ui);
 
             if let Some(primitives) = ui.draw_if_changed() {
                 renderer.fill(&display, primitives, &image_map);
@@ -160,8 +180,5 @@ fn main() {
         });
 
     tokio::runtime::current_thread::block_on_all(main_loop).unwrap();
-    tokio::runtime::current_thread::block_on_all(background_task_runtime.shutdown_on_idle())
-        .unwrap();
-
     process::exit(0);
 }
