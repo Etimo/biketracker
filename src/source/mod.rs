@@ -10,16 +10,16 @@ use futures::sync::{mpsc, oneshot};
 use std::thread;
 
 /// A snapshot of the state of the bike.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct BikeMeasurement {
     /// The distance travelled so far in this session, measured in metres.
-    pub cumulative_wheel_meters: Option<f64>,
+    pub cumulative_wheel_meters: f64,
 }
 
 impl Default for BikeMeasurement {
     fn default() -> Self {
         BikeMeasurement {
-            cumulative_wheel_meters: Some(0.0),
+            cumulative_wheel_meters: 0.0,
         }
     }
 }

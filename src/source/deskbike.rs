@@ -262,7 +262,8 @@ impl From<CscMeasurement> for BikeMeasurement {
         BikeMeasurement {
             cumulative_wheel_meters: csc
                 .cumulative_wheel_revolutions
-                .map(|revs| revs as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS),
+                .map(|revs| revs as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS)
+                .unwrap_or(0.0),
         }
     }
 }
