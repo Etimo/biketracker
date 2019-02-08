@@ -24,7 +24,7 @@ use std::process;
 
 use failure::Error;
 
-use source::{measurements_stream, BikeMeasurementStream};
+use source::{measurements_stream, BikeMeasurement, BikeMeasurementStream};
 
 widget_ids! {
     struct Ids {
@@ -33,6 +33,7 @@ widget_ids! {
         connecting_page_header,
         connect_failed_page_header,
         cycling_page_header,
+        cycling_page_distance,
     }
 }
 
@@ -43,7 +44,7 @@ enum Page {
     Login,
     Connecting(Box<Future<Item = BikeMeasurementStream, Error = Error>>),
     ConnectFailed(Error),
-    Cycling(BikeMeasurementStream),
+    Cycling(BikeMeasurementStream, BikeMeasurement),
 }
 
 struct State {
@@ -60,12 +61,21 @@ fn update(state: &mut State) {
     match &mut state.page {
         Page::Login => {}
         Page::Connecting(ref mut connect_handle) => match connect_handle.poll() {
-            Ok(Async::Ready(bike)) => state.page = Page::Cycling(bike),
+            Ok(Async::Ready(bike)) => state.page = Page::Cycling(bike, BikeMeasurement::default()),
             Ok(Async::NotReady) => {}
             Err(err) => state.page = Page::ConnectFailed(err),
         },
         Page::ConnectFailed(_) => {}
-        Page::Cycling(_) => {}
+        Page::Cycling(stream, measurement) => {
+            match stream.poll() {
+                Ok(Async::Ready(Some(new_measurement))) => *measurement = new_measurement,
+                // Stream finished
+                Ok(Async::Ready(None)) => state.page = Page::Login,
+                // No new update
+                Ok(Async::NotReady) => {}
+                Err(err) => state.page = Page::ConnectFailed(err),
+            }
+        }
     }
 }
 
@@ -88,10 +98,12 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
                     .was_clicked()
                 {
+                    // state.page = Page::Connecting(Box::new(measurements_stream(|| {
+                    //     Ok(source::FakeBike::new())
+                    // })));
                     state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                        Ok(source::FakeBike::new())
+                        source::Deskbike::connect().map_err(Error::from)
                     })));
-                    // state.page = Page::Connecting(Box::new(measurements_stream(|| source::Deskbike::connect().map_err(Error::from))));
 
                     println!("{}", CYCLISTS[item.i]);
                 }
@@ -107,13 +119,27 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .font_size(32)
                 .set(ids.connecting_page_header, ui);
         }
-        Page::ConnectFailed(_) => unreachable!(),
-        Page::Cycling(_bike) => {
+        Page::ConnectFailed(err) => {
+            widget::Text::new(&format!("Connection failed: {}", err))
+                .middle_of(ui.window)
+                .color(conrod::color::RED)
+                .font_size(32)
+                .set(ids.connect_failed_page_header, ui);
+        }
+        Page::Cycling(_bike, measurement) => {
             widget::Text::new("Connected!")
                 .middle_of(ui.window)
                 .color(conrod::color::WHITE)
                 .font_size(32)
                 .set(ids.cycling_page_header, ui);
+
+            widget::Text::new(&format!(
+                "Travelled: {:?}m",
+                measurement.cumulative_wheel_meters
+            ))
+            .color(conrod::color::WHITE)
+            .font_size(32)
+            .set(ids.cycling_page_distance, ui);
         }
     }
 }

@@ -13,7 +13,15 @@ use std::thread;
 #[derive(Debug, PartialEq)]
 pub struct BikeMeasurement {
     /// The distance travelled so far in this session, measured in metres.
-    cumulative_wheel_meters: Option<f64>,
+    pub cumulative_wheel_meters: Option<f64>,
+}
+
+impl Default for BikeMeasurement {
+    fn default() -> Self {
+        BikeMeasurement {
+            cumulative_wheel_meters: Some(0.0),
+        }
+    }
 }
 
 /// A connection to a bike.
