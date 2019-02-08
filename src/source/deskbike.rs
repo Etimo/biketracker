@@ -137,7 +137,7 @@ where
             match BluetoothEvent::from(msg) {
                 Some(BluetoothEvent::RSSI {
                     object_path,
-                    rssi: _,
+                    ..
                 })
                 | Some(BluetoothEvent::Connected {
                     object_path,
@@ -262,7 +262,7 @@ impl From<CscMeasurement> for BikeMeasurement {
         BikeMeasurement {
             cumulative_wheel_meters: csc
                 .cumulative_wheel_revolutions
-                .map(|revs| revs as f64 * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS)
+                .map(|revs| f64::from(revs) * DESKBIKE_WHEEL_CIRCUMFERENCE_METERS)
                 .unwrap_or(0.0),
         }
     }
@@ -352,7 +352,7 @@ impl<'a> Iterator for CscMeasurements<'a> {
                             Err(err) => return Some(Err(err.into())),
                         };
                         if let Some(ref calibration_data) = self.calibration_data {
-                            return Some(Ok((&measurement - &calibration_data).into()));
+                            return Some(Ok((&measurement - calibration_data).into()));
                         } else {
                             self.calibration_data = Some(measurement);
                         }

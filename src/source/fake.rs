@@ -5,8 +5,8 @@ use std::{thread, time};
 /// A fake bike providing dummy data.
 pub struct FakeBike;
 
-impl FakeBike {
-    pub fn new() -> FakeBike {
+impl Default for FakeBike {
+    fn default() -> Self {
         thread::sleep(time::Duration::from_millis(500));
         FakeBike
     }

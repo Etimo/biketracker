@@ -1,7 +1,6 @@
 // Very much based on https://github.com/PistonDevelopers/conrod/blob/master/examples/hello_world.rs
 
 mod event_loop;
-mod source;
 
 use conrod::backend::glium::glium::glutin::dpi::LogicalSize;
 use conrod::backend::glium::glium::glutin::{
@@ -24,7 +23,7 @@ use std::process;
 
 use failure::Error;
 
-use source::{measurements_stream, BikeMeasurement, BikeMeasurementStream};
+use biketracker::source::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
 
 widget_ids! {
     struct Ids {
@@ -98,12 +97,12 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
                     .was_clicked()
                 {
-                    // state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                    //     Ok(source::FakeBike::new())
-                    // })));
                     state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                        source::Deskbike::connect().map_err(Error::from)
+                        Ok(source::FakeBike::default())
                     })));
+                    // state.page = Page::Connecting(Box::new(measurements_stream(|| {
+                    //     source::Deskbike::connect().map_err(Error::from)
+                    // })));
 
                     println!("{}", CYCLISTS[item.i]);
                 }
@@ -170,12 +169,11 @@ fn main() {
     let main_loop = event_stream(events_loop)
         .take_while(|events| {
             for event in events.iter() {
-                match &event {
-                    Event::WindowEvent {
-                        event: WindowEvent::CloseRequested,
-                        ..
-                    } => return Ok(false),
-                    _ => {}
+                if let Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } = &event {
+                    return Ok(false);
                 }
             }
             Ok(true)
