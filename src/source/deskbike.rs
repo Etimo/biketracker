@@ -284,21 +284,13 @@ impl std::ops::Sub for &CscMeasurement {
                 other.cumulative_wheel_revolutions,
             )
             .map(|(one, two)| one - two),
-            last_wheel_event_time: zip_option(
-                self.last_wheel_event_time,
-                other.last_wheel_event_time,
-            )
-            .map(|(one, two)| one - two),
+            last_wheel_event_time: self.last_wheel_event_time,
             cumulative_crank_revolutions: zip_option(
                 self.cumulative_crank_revolutions,
                 other.cumulative_crank_revolutions,
             )
             .map(|(one, two)| one - two),
-            last_crank_event_time: zip_option(
-                self.last_crank_event_time,
-                other.last_crank_event_time,
-            )
-            .map(|(one, two)| one - two),
+            last_crank_event_time: self.last_wheel_event_time,
         }
     }
 }
