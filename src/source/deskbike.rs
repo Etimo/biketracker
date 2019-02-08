@@ -142,6 +142,8 @@ where
                 | Some(BluetoothEvent::Connected {
                     object_path,
                     connected: true,
+                }) | Some(BluetoothEvent::None {
+                    object_path,
                 }) => {
                     let device = BluetoothDevice::new(session, object_path);
                     if pred(&device) {

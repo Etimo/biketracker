@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 # blurz = "0.4.0"
 # We need the error to be Sync for compatibility with Failure, see szeged/blurz#24
-blurz = { git = "https://github.com/teozkr/blurz", branch = "sync-errors" }
+blurz = { git = "https://github.com/teozkr/blurz", branch = "biketracker" }
 dbus = "0.6.4"
 failure = "0.1.5"
 nom = "4.2.0"
