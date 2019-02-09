@@ -23,7 +23,7 @@ use std::process;
 
 use failure::Error;
 
-use biketracker::source::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
+use biketracker::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
 
 widget_ids! {
     struct Ids {
@@ -98,7 +98,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .was_clicked()
                 {
                     state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                        Ok(source::FakeBike::default())
+                        Ok(bike::FakeBike::default())
                     })));
                     // state.page = Page::Connecting(Box::new(measurements_stream(|| {
                     //     source::Deskbike::connect().map_err(Error::from)
@@ -181,11 +181,9 @@ fn main() {
         .for_each(move |events| {
             for event in events {
                 // Use the `winit` backend feature to convert the winit event to a conrod input.
-                let input = match conrod::backend::winit::convert_event(event, &display) {
-                    None => continue,
-                    Some(input) => input,
-                };
-                ui.handle_event(input);
+                if let Some(input) = conrod::backend::winit::convert_event(event, &display) {
+                    ui.handle_event(input);
+                }
             }
 
             let ui = &mut ui.set_widgets();
