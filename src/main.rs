@@ -239,7 +239,7 @@ fn main() {
     let window = WindowBuilder::new()
         .with_title("BikeTracker")
         .with_dimensions(LogicalSize::new(width, height));
-    let context = ContextBuilder::new().with_vsync(true).with_multisampling(2);
+    let context = ContextBuilder::new().with_vsync(true);
     let display = Display::new(window, context, &events_loop).unwrap();
     let image_map = image::Map::<Texture2d>::new();
     let mut renderer = Renderer::new(&display).unwrap();
