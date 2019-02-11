@@ -45,9 +45,19 @@ static CYCLISTS: [&'static str; 3] = ["Jens", "Erik", "Johan"];
 
 enum Page {
     Login,
-    Connecting(Box<dyn Future<Item = BikeMeasurementStream, Error = Error>>),
-    ConnectFailed { err: Error, reported: bool },
-    Cycling(BikeMeasurementStream, BikeMeasurement),
+    Connecting {
+        future_bike: Box<dyn Future<Item = BikeMeasurementStream, Error = Error>>,
+        username: String,
+    },
+    ConnectFailed {
+        err: Error,
+        reported: bool,
+    },
+    Cycling {
+        bike: BikeMeasurementStream,
+        last_measurement: BikeMeasurement,
+        username: String,
+    },
     Reporting(Box<dyn Future<Item = (), Error = Error>>),
 }
 
@@ -68,8 +78,17 @@ impl State {
 fn update(state: &mut State) {
     match &mut state.page {
         Page::Login => {}
-        Page::Connecting(connect_handle) => match connect_handle.poll() {
-            Ok(Async::Ready(bike)) => state.page = Page::Cycling(bike, BikeMeasurement::default()),
+        Page::Connecting {
+            future_bike,
+            username,
+        } => match future_bike.poll() {
+            Ok(Async::Ready(bike)) => {
+                state.page = Page::Cycling {
+                    bike,
+                    last_measurement: BikeMeasurement::default(),
+                    username: username.clone(),
+                }
+            }
             Ok(Async::NotReady) => {}
             Err(err) => {
                 state.page = Page::ConnectFailed {
@@ -79,15 +98,19 @@ fn update(state: &mut State) {
             }
         },
         Page::ConnectFailed { .. } => {}
-        Page::Cycling(stream, measurement) => {
-            match stream.poll() {
-                Ok(Async::Ready(Some(new_measurement))) => *measurement = new_measurement,
+        Page::Cycling {
+            bike,
+            last_measurement,
+            username,
+        } => {
+            match bike.poll() {
+                Ok(Async::Ready(Some(new_measurement))) => *last_measurement = new_measurement,
                 // Stream finished
                 Ok(Async::Ready(None)) => {
                     state.page = Page::Reporting(
                         state
                             .reporter
-                            .session_done(measurement, "foobar".to_owned()),
+                            .session_done(last_measurement, username.clone()),
                     )
                 }
                 // No new update
@@ -132,9 +155,12 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
                     .was_clicked()
                 {
-                    state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                        Ok(bike::FakeBike::default())
-                    })));
+                    state.page = Page::Connecting {
+                        future_bike: Box::new(measurements_stream(
+                            || Ok(bike::FakeBike::default()),
+                        )),
+                        username: CYCLISTS[item.i].to_owned(),
+                    };
                     // state.page = Page::Connecting(Box::new(measurements_stream(|| {
                     //     source::Deskbike::connect().map_err(Error::from)
                     // })));
@@ -146,7 +172,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 scrollbar.set(ui);
             }
         }
-        Page::Connecting(_) => {
+        Page::Connecting { .. } => {
             widget::Text::new("Connecting...")
                 .middle_of(ui.window)
                 .color(conrod::color::WHITE)
@@ -164,7 +190,11 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 *reported = true;
             }
         }
-        Page::Cycling(_bike, measurement) => {
+        Page::Cycling {
+            last_measurement,
+            username,
+            ..
+        } => {
             widget::Text::new("Connected!")
                 .middle_of(ui.window)
                 .color(conrod::color::WHITE)
@@ -173,7 +203,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
 
             widget::Text::new(&format!(
                 "Travelled: {:?}m",
-                measurement.cumulative_wheel_meters
+                last_measurement.cumulative_wheel_meters
             ))
             .color(conrod::color::WHITE)
             .font_size(32)
@@ -187,7 +217,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 state.page = Page::Reporting(
                     state
                         .reporter
-                        .session_done(measurement, "foobar".to_owned()),
+                        .session_done(last_measurement, username.clone()),
                 );
             }
         }
