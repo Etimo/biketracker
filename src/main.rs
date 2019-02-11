@@ -51,7 +51,6 @@ enum Page {
     },
     ConnectFailed {
         err: Error,
-        reported: bool,
     },
     Cycling {
         bike: BikeMeasurementStream,
@@ -75,6 +74,13 @@ impl State {
     }
 }
 
+fn report_error(state: &mut State, err: Error) {
+    println!("{}", err);
+    state.page = Page::ConnectFailed {
+        err,
+    }
+}
+
 fn update(state: &mut State) {
     match &mut state.page {
         Page::Login => {}
@@ -91,10 +97,7 @@ fn update(state: &mut State) {
             }
             Ok(Async::NotReady) => {}
             Err(err) => {
-                state.page = Page::ConnectFailed {
-                    err,
-                    reported: false,
-                }
+                report_error(state, err);
             }
         },
         Page::ConnectFailed { .. } => {}
@@ -116,10 +119,7 @@ fn update(state: &mut State) {
                 // No new update
                 Ok(Async::NotReady) => {}
                 Err(err) => {
-                    state.page = Page::ConnectFailed {
-                        err,
-                        reported: false,
-                    }
+                    report_error(state, err);
                 }
             }
         }
@@ -127,10 +127,7 @@ fn update(state: &mut State) {
             Ok(Async::Ready(_)) => state.page = Page::Login,
             Ok(Async::NotReady) => {}
             Err(err) => {
-                state.page = Page::ConnectFailed {
-                    err,
-                    reported: false,
-                }
+                report_error(state, err);
             }
         },
     }
@@ -179,16 +176,12 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .font_size(32)
                 .set(ids.connecting_page_header, ui);
         }
-        Page::ConnectFailed { err, reported } => {
+        Page::ConnectFailed { err } => {
             widget::Text::new(&format!("Connection failed: {}", err))
                 .middle_of(ui.window)
                 .color(conrod::color::RED)
                 .font_size(32)
                 .set(ids.connect_failed_page_header, ui);
-            if !*reported {
-                println!("{}", err);
-                *reported = true;
-            }
         }
         Page::Cycling {
             last_measurement,
