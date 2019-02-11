@@ -25,7 +25,9 @@ pub struct FakeMeasurements {
 impl FakeMeasurements {
     fn new() -> Self {
         FakeMeasurements {
-            state: BikeMeasurement { cumulative_wheel_meters: 0.0 },
+            state: BikeMeasurement {
+                cumulative_wheel_meters: 0.0,
+            },
         }
     }
 }

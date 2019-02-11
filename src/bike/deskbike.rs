@@ -135,16 +135,12 @@ where
     loop {
         for msg in session.incoming(100) {
             match BluetoothEvent::from(msg) {
-                Some(BluetoothEvent::RSSI {
-                    object_path,
-                    ..
-                })
+                Some(BluetoothEvent::RSSI { object_path, .. })
                 | Some(BluetoothEvent::Connected {
                     object_path,
                     connected: true,
-                }) | Some(BluetoothEvent::None {
-                    object_path,
-                }) => {
+                })
+                | Some(BluetoothEvent::None { object_path }) => {
                     let device = BluetoothDevice::new(session, object_path);
                     if pred(&device) {
                         return Ok(device);

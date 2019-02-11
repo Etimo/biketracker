@@ -1,7 +1,7 @@
 {pkgs ? import <nixpkgs> {}}:
 pkgs.mkShell {
   buildInputs = [
-    pkgs.cargo pkgs.dbus pkgs.pkgconfig
+    pkgs.cargo pkgs.dbus pkgs.pkgconfig pkgs.openssl
   ];
 
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [

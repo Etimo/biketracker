@@ -18,12 +18,14 @@ use conrod::{
 use event_loop::event_stream;
 
 use futures::prelude::*;
+use tokio::runtime::TaskExecutor;
 
 use std::process;
 
 use failure::Error;
 
 use biketracker::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
+use biketracker::reporter::{self, Reporter};
 
 widget_ids! {
     struct Ids {
@@ -33,6 +35,8 @@ widget_ids! {
         connect_failed_page_header,
         cycling_page_header,
         cycling_page_distance,
+        cycling_page_done,
+        reporting_page_header,
     }
 }
 
@@ -41,30 +45,40 @@ static CYCLISTS: [&'static str; 3] = ["Jens", "Erik", "Johan"];
 
 enum Page {
     Login,
-    Connecting(Box<Future<Item = BikeMeasurementStream, Error = Error>>),
-    ConnectFailed(Error),
+    Connecting(Box<dyn Future<Item = BikeMeasurementStream, Error = Error>>),
+    ConnectFailed { err: Error, reported: bool },
     Cycling(BikeMeasurementStream, BikeMeasurement),
+    Reporting(Box<dyn Future<Item = (), Error = Error>>),
 }
 
 struct State {
     page: Page,
+    reporter: Box<dyn Reporter>,
 }
 
 impl State {
-    fn new() -> State {
-        State { page: Page::Login }
+    fn new(bg_executor: TaskExecutor) -> State {
+        State {
+            page: Page::Login,
+            reporter: Box::new(reporter::StdoutReporter::new(bg_executor)),
+        }
     }
 }
 
 fn update(state: &mut State) {
     match &mut state.page {
         Page::Login => {}
-        Page::Connecting(ref mut connect_handle) => match connect_handle.poll() {
+        Page::Connecting(connect_handle) => match connect_handle.poll() {
             Ok(Async::Ready(bike)) => state.page = Page::Cycling(bike, BikeMeasurement::default()),
             Ok(Async::NotReady) => {}
-            Err(err) => state.page = Page::ConnectFailed(err),
+            Err(err) => {
+                state.page = Page::ConnectFailed {
+                    err,
+                    reported: false,
+                }
+            }
         },
-        Page::ConnectFailed(_) => {}
+        Page::ConnectFailed { .. } => {}
         Page::Cycling(stream, measurement) => {
             match stream.poll() {
                 Ok(Async::Ready(Some(new_measurement))) => *measurement = new_measurement,
@@ -72,14 +86,29 @@ fn update(state: &mut State) {
                 Ok(Async::Ready(None)) => state.page = Page::Login,
                 // No new update
                 Ok(Async::NotReady) => {}
-                Err(err) => state.page = Page::ConnectFailed(err),
+                Err(err) => {
+                    state.page = Page::ConnectFailed {
+                        err,
+                        reported: false,
+                    }
+                }
             }
         }
+        Page::Reporting(report) => match report.poll() {
+            Ok(Async::Ready(_)) => state.page = Page::Login,
+            Ok(Async::NotReady) => {}
+            Err(err) => {
+                state.page = Page::ConnectFailed {
+                    err,
+                    reported: false,
+                }
+            }
+        },
     }
 }
 
 fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
-    match &state.page {
+    match &mut state.page {
         Page::Login => {
             widget::Text::new("Who are you?")
                 .middle_of(ui.window)
@@ -118,12 +147,16 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .font_size(32)
                 .set(ids.connecting_page_header, ui);
         }
-        Page::ConnectFailed(err) => {
+        Page::ConnectFailed { err, reported } => {
             widget::Text::new(&format!("Connection failed: {}", err))
                 .middle_of(ui.window)
                 .color(conrod::color::RED)
                 .font_size(32)
                 .set(ids.connect_failed_page_header, ui);
+            if !*reported {
+                println!("{}", err);
+                *reported = true;
+            }
         }
         Page::Cycling(_bike, measurement) => {
             widget::Text::new("Connected!")
@@ -139,6 +172,25 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
             .color(conrod::color::WHITE)
             .font_size(32)
             .set(ids.cycling_page_distance, ui);
+
+            if widget::Button::new()
+                .label("Done")
+                .set(ids.cycling_page_done, ui)
+                .was_clicked()
+            {
+                state.page = Page::Reporting(
+                    state
+                        .reporter
+                        .session_done(measurement, "foobar".to_owned()),
+                );
+            }
+        }
+        Page::Reporting(_) => {
+            widget::Text::new("Uploading report...")
+                .middle_of(ui.window)
+                .color(conrod::color::WHITE)
+                .font_size(32)
+                .set(ids.reporting_page_header, ui);
         }
     }
 }
@@ -165,14 +217,17 @@ fn main() {
     .unwrap();
     ui.fonts.insert(noto_sans);
 
-    let mut state = State::new();
+    let bg_runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let mut state = State::new(bg_runtime.executor());
     let main_loop = event_stream(events_loop)
         .take_while(|events| {
             for event in events.iter() {
                 if let Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
-                } = &event {
+                } = &event
+                {
                     return Ok(false);
                 }
             }
