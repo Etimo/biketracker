@@ -83,7 +83,13 @@ fn update(state: &mut State) {
             match stream.poll() {
                 Ok(Async::Ready(Some(new_measurement))) => *measurement = new_measurement,
                 // Stream finished
-                Ok(Async::Ready(None)) => state.page = Page::Login,
+                Ok(Async::Ready(None)) => {
+                    state.page = Page::Reporting(
+                        state
+                            .reporter
+                            .session_done(measurement, "foobar".to_owned()),
+                    )
+                }
                 // No new update
                 Ok(Async::NotReady) => {}
                 Err(err) => {
