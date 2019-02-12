@@ -17,12 +17,13 @@ use conrod::{
 
 use event_loop::event_stream;
 
+use futures::future;
 use futures::prelude::*;
 use tokio::runtime::TaskExecutor;
 
-use std::process;
+use std::{env, process};
 
-use failure::Error;
+use failure::{format_err, Error};
 
 use biketracker::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
 use biketracker::reporter::{self, Reporter};
@@ -76,8 +77,21 @@ impl State {
 
 fn report_error(state: &mut State, err: Error) {
     println!("{}", err);
-    state.page = Page::ConnectFailed {
-        err,
+    state.page = Page::ConnectFailed { err }
+}
+
+fn connect_to_bike() -> Box<dyn Future<Item = BikeMeasurementStream, Error = Error>> {
+    match env::var("BIKETRACKER_BIKE").as_ref().map(|x| &x[..]) {
+        Ok("deskbike") | Err(env::VarError::NotPresent) =>
+            Box::new(measurements_stream(
+                || bike::Deskbike::connect().map_err(|x| x.into()),
+            )),
+        Ok("fake") =>
+            Box::new(measurements_stream(
+                || Ok(bike::FakeBike::default()),
+            )),
+        Ok(x) => Box::new(future::err(format_err!("Unknown bike type {:?} requested, $BIKETRACKER_BIKE should be deskbike (default) or fake", x))),
+        Err(err @ env::VarError::NotUnicode(_)) => Box::new(future::err(err.clone().into())),
     }
 }
 
@@ -153,14 +167,9 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .was_clicked()
                 {
                     state.page = Page::Connecting {
-                        future_bike: Box::new(measurements_stream(
-                            || Ok(bike::FakeBike::default()),
-                        )),
+                        future_bike: connect_to_bike(),
                         username: CYCLISTS[item.i].to_owned(),
                     };
-                    // state.page = Page::Connecting(Box::new(measurements_stream(|| {
-                    //     source::Deskbike::connect().map_err(Error::from)
-                    // })));
 
                     println!("{}", CYCLISTS[item.i]);
                 }
