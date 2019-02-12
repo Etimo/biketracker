@@ -34,6 +34,7 @@ widget_ids! {
         login_page_user_list,
         connecting_page_header,
         connect_failed_page_header,
+        connect_failed_page_home,
         cycling_page_header,
         cycling_page_distance,
         cycling_page_done,
@@ -191,6 +192,13 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .color(conrod::color::RED)
                 .font_size(32)
                 .set(ids.connect_failed_page_header, ui);
+            if widget::Button::new()
+                .label("Home")
+                .set(ids.connect_failed_page_home, ui)
+                .was_clicked()
+            {
+                state.page = Page::Login;
+            }
         }
         Page::Cycling {
             last_measurement,
