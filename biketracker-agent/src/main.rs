@@ -25,8 +25,8 @@ use std::{env, process};
 
 use failure::{format_err, Error};
 
-use biketracker::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
-use biketracker::reporter::{self, Reporter};
+use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
+use biketracker_agent::reporter::{self, Reporter};
 
 widget_ids! {
     struct Ids {

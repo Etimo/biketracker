@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "biketracker"
+name = "biketracker-agent"
 version = "0.1.0"
 dependencies = [
  "blurz 0.4.0 (git+https://github.com/teozkr/blurz?branch=biketracker)",
