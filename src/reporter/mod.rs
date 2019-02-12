@@ -1,7 +1,5 @@
-pub mod prometheus;
 pub mod stdout;
 
-pub use self::prometheus::PrometheusReporter;
 pub use stdout::StdoutReporter;
 
 use crate::bike::BikeMeasurement;
