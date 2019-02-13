@@ -1,0 +1,22 @@
+[package]
+name = "biketracker-server"
+version = "0.1.0"
+authors = ["Teo Klestrup Röijezon <teo.roijezon@etimo.se>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1.5"
+hyper = "0.12.24"
+futures = "0.1.25"
+serde = "1.0.87"
+serde_derive = "1.0.87"
+serde_json = "1.0.38"
+chrono = "0.4.6"
+
+[dependencies.tokio-postgres]
+git = "https://github.com/sfackler/rust-postgres"
+features = ["with-uuid-0.7", "with-chrono-0.4"]
+
+[dependencies.uuid]
+version = "0.7.2"
+features = ["v4"]

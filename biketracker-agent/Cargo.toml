@@ -1,7 +1,7 @@
 [package]
 name = "biketracker-agent"
 version = "0.1.0"
-authors = ["Teo Klestrup Röijezon <teo@nullable.se>"]
+authors = ["Teo Klestrup Röijezon <teo.roijezon@etimo.se>"]
 edition = "2018"
 
 [dependencies]

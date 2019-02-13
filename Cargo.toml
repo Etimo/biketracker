@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-    "biketracker-agent"
+    "biketracker-agent",
+    "biketracker-server"
 ]
