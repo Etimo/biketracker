@@ -1,4 +1,5 @@
 mod bike_session;
+pub mod config;
 mod db;
 
 use failure::{format_err, Error, Fail};
@@ -7,6 +8,8 @@ use futures::prelude::*;
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use serde::Deserialize;
+
+use self::config::ServerConfig;
 
 #[derive(Debug, Fail)]
 enum ReqError {
@@ -60,9 +63,12 @@ fn deserialize_json_body<T: for<'de> Deserialize<'de>>(
 
 fn handle_post_bike_session(
     req: Request<Body>,
+    config: ServerConfig,
 ) -> impl Future<Item = Response<Body>, Error = ReqError> + Send {
     deserialize_json_body::<bike_session::NewBikeSession>(req)
-        .and_then(|session| bike_session::add_bike_session(session).map_err(ReqError::internal))
+        .and_then(|session| {
+            bike_session::add_bike_session(session, config).map_err(ReqError::internal)
+        })
         .and_then(|()| {
             Response::builder()
                 .body(Body::from("OK"))
@@ -70,18 +76,23 @@ fn handle_post_bike_session(
         })
 }
 
-fn handle(req: Request<Body>) -> Box<Future<Item = Response<Body>, Error = ReqError> + Send> {
+fn handle(
+    req: Request<Body>,
+    config: ServerConfig,
+) -> Box<Future<Item = Response<Body>, Error = ReqError> + Send> {
     match (req.method(), req.uri().path()) {
-        (&Method::POST, "/bike/session") => Box::new(handle_post_bike_session(req)),
+        (&Method::POST, "/bike/session") => Box::new(handle_post_bike_session(req, config)),
         _ => Box::new(future::err(ReqError::NotFound)),
     }
 }
 
 fn main() {
-    let addr = ([127, 0, 0, 1], 4000).into();
-    let svc = || {
-        service_fn(|req| {
-            handle(req).or_else(|err| match err {
+    let config = ServerConfig::load().unwrap();
+    let addr = (config.listen.ip, config.listen.port).into();
+    let svc = move || {
+        let config = config.clone();
+        service_fn(move |req| {
+            handle(req, config.clone()).or_else(|err| match err {
                 ReqError::InternalServerError { cause } => {
                     eprintln!("Internal server error: {}", cause);
                     Response::builder()
@@ -97,6 +108,7 @@ fn main() {
             })
         })
     };
+    println!("Listening on {}", &addr);
     let server = Server::bind(&addr).serve(svc).map_err(|err| {
         eprintln!("Server failed: {}", err);
     });

@@ -1,0 +1,6 @@
+[db]
+url = "postgres://biketracker:feKui9Be@localhost/biketracker"
+
+[listen]
+ip = "0.0.0.0"
+port = 4000
