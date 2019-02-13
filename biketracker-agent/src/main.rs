@@ -32,15 +32,18 @@ use self::config::{AgentConfig, BikeConfig, ReporterConfig};
 
 widget_ids! {
     struct Ids {
-        login_page_header,
+        root_canvas,
+        header_canvas,
+        app_title_canvas,
+        page_title_canvas,
+        page_canvas,
+        buttonbar_canvas,
+        app_title,
+        page_title,
         login_page_user_list,
-        connecting_page_header,
-        connect_failed_page_header,
         connect_failed_page_home,
-        cycling_page_header,
         cycling_page_distance,
         cycling_page_done,
-        reporting_page_header,
     }
 }
 
@@ -155,16 +158,47 @@ fn update(state: &mut State) {
     }
 }
 
+trait PositionableSizeableExt {
+    fn fill(self, parent: widget::id::Id) -> Self;
+}
+
+impl<W: Positionable + Sizeable> PositionableSizeableExt for W {
+    fn fill(self, parent: widget::id::Id) -> Self {
+        self
+            .kid_area_wh_of(parent)
+            .middle_of(parent)
+    }
+}
+
 fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
+    widget::Canvas::new()
+        .flow_down(&[
+            (ids.header_canvas, widget::Canvas::new().length(40.0).flow_right(&[
+                (ids.page_title_canvas, widget::Canvas::new()),
+                (ids.app_title_canvas, widget::Canvas::new().length(120.0)),
+            ])),
+            (ids.page_canvas, widget::Canvas::new()),
+            (ids.buttonbar_canvas, widget::Canvas::new().length(30.0)),
+        ])
+        .set(ids.root_canvas, ui);
+
+    widget::Text::new("Etimo BikeTracker")
+        .fill(ids.app_title_canvas)
+        .right_justify()
+        .color(conrod::color::WHITE)
+        .font_size(16)
+        .set(ids.app_title, ui);
+
     match &mut state.page {
         Page::Login => {
             widget::Text::new("Who are you?")
-                .middle_of(ui.window)
+                .fill(ids.page_title_canvas)
                 .color(conrod::color::WHITE)
                 .font_size(32)
-                .set(ids.login_page_header, ui);
+                .set(ids.page_title, ui);
             let (mut items, scrollbar) = widget::List::flow_down(CYCLISTS.len())
-                .h(150.0)
+                // .h(150.0)
+                .fill(ids.page_canvas)
                 .scrollbar_next_to()
                 .scrollbar_color(conrod::color::WHITE)
                 .item_size(30.0)
@@ -188,19 +222,20 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         }
         Page::Connecting { .. } => {
             widget::Text::new("Connecting...")
-                .middle_of(ui.window)
+                .fill(ids.page_title_canvas)
                 .color(conrod::color::WHITE)
                 .font_size(32)
-                .set(ids.connecting_page_header, ui);
+                .set(ids.page_title, ui);
         }
         Page::ConnectFailed { err } => {
             widget::Text::new(&format!("Connection failed: {}", err))
-                .middle_of(ui.window)
+                .fill(ids.page_title_canvas)
                 .color(conrod::color::RED)
                 .font_size(32)
-                .set(ids.connect_failed_page_header, ui);
+                .set(ids.page_title, ui);
             if widget::Button::new()
                 .label("Home")
+                .fill(ids.buttonbar_canvas)
                 .set(ids.connect_failed_page_home, ui)
                 .was_clicked()
             {
@@ -213,21 +248,23 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
             ..
         } => {
             widget::Text::new("Connected!")
-                .middle_of(ui.window)
+                .fill(ids.page_title_canvas)
                 .color(conrod::color::WHITE)
                 .font_size(32)
-                .set(ids.cycling_page_header, ui);
+                .set(ids.page_title, ui);
 
             widget::Text::new(&format!(
                 "Travelled: {:?}m",
                 last_measurement.cumulative_wheel_meters
             ))
+                .fill(ids.page_canvas)
             .color(conrod::color::WHITE)
             .font_size(32)
             .set(ids.cycling_page_distance, ui);
 
             if widget::Button::new()
                 .label("Done")
+                .fill(ids.buttonbar_canvas)
                 .set(ids.cycling_page_done, ui)
                 .was_clicked()
             {
@@ -240,10 +277,10 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         }
         Page::Reporting(_) => {
             widget::Text::new("Uploading report...")
-                .middle_of(ui.window)
+                .fill(ids.page_title_canvas)
                 .color(conrod::color::WHITE)
                 .font_size(32)
-                .set(ids.reporting_page_header, ui);
+                .set(ids.page_title, ui);
         }
     }
 }
