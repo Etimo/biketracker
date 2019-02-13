@@ -110,6 +110,23 @@ impl<'a> Drop for DiscoverySessionGuard<'a> {
     }
 }
 
+fn find_known_device<'a, F>(
+    session: &'a BluetoothSession,
+    adapter: &BluetoothAdapter,
+    mut pred: F,
+) -> Result<Option<BluetoothDevice<'a>>, DeskbikeError>
+where
+    F: FnMut(&BluetoothDevice) -> bool,
+{
+    for known_device in adapter.get_device_list().map_err(bt_err)? {
+        let device = BluetoothDevice::new(session, known_device);
+        if pred(&device) {
+            return Ok(Some(device));
+        }
+    }
+    Ok(None)
+}
+
 fn find_device<'a, F>(
     session: &'a BluetoothSession,
     adapter: &BluetoothAdapter,
@@ -118,35 +135,38 @@ fn find_device<'a, F>(
 where
     F: FnMut(&BluetoothDevice) -> bool,
 {
-    for known_device in adapter.get_device_list().map_err(bt_err)? {
-        let device = BluetoothDevice::new(session, known_device);
-        if pred(&device) {
-            // return Ok(device);
-            // For some reason we sometimes fail to subscribe to devices that BlueZ already knows about
-            // Deleting them and repairing seems to work...
-            println!("Device is already known, deleting it...");
-            adapter.remove_device(device.get_id()).map_err(bt_err)?;
-        }
+    if let Some(device) = find_known_device(session, adapter, |dev| pred(dev))? {
+        // return Ok(device);
+        // For some reason we sometimes fail to subscribe to devices that BlueZ already knows about
+        // Deleting them and repairing seems to work...
+        println!("Device is already known, deleting it...");
+        adapter.remove_device(device.get_id()).map_err(bt_err)?;
     }
 
     // Failed to find known device, let's try to discover it
     println!("Failed to find device, starting discovery...");
     let _disc_session = DiscoverySessionGuard::new(session, adapter);
     loop {
-        for msg in session.incoming(100) {
-            match BluetoothEvent::from(msg) {
-                Some(BluetoothEvent::RSSI { object_path, .. })
-                | Some(BluetoothEvent::Connected {
-                    object_path,
-                    connected: true,
-                })
-                | Some(BluetoothEvent::None { object_path }) => {
-                    let device = BluetoothDevice::new(session, object_path);
-                    if pred(&device) {
-                        return Ok(device);
-                    }
-                }
-                _ => {}
+        for _msg in session.incoming(100) {
+            // match BluetoothEvent::from(msg) {
+            //     Some(BluetoothEvent::RSSI { object_path, .. })
+            //     | Some(BluetoothEvent::Connected {
+            //         object_path,
+            //         connected: true,
+            //     })
+            //     | Some(BluetoothEvent::None { object_path }) => {
+            //         let device = BluetoothDevice::new(session, object_path);
+            //         if pred(&device) {
+            //             return Ok(device);
+            //         }
+            //     }
+            //     _ => {}
+            // }
+
+            // We only get events when RSSI is triggered, but BlueZ seems to find the device much earlier
+            // FIXME: Figure out if there is an event for the true discovery? Surely this must exist...
+            if let Some(device) = find_known_device(session, adapter, |dev| pred(dev))? {
+                return Ok(device);
             }
         }
     }
