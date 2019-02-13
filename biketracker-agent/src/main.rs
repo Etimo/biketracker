@@ -71,7 +71,8 @@ impl State {
     fn new(bg_executor: TaskExecutor) -> State {
         State {
             page: Page::Login,
-            reporter: Box::new(reporter::StdoutReporter::new(bg_executor)),
+            // reporter: Box::new(reporter::StdoutReporter::new(bg_executor)),
+            reporter: Box::new(reporter::ServerReporter::new()),
         }
     }
 }

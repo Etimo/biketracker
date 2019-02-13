@@ -1,5 +1,7 @@
+pub mod server;
 pub mod stdout;
 
+pub use server::ServerReporter;
 pub use stdout::StdoutReporter;
 
 use crate::bike::BikeMeasurement;
