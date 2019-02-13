@@ -14,9 +14,9 @@ pub struct ServerReporter {
 }
 
 impl ServerReporter {
-    pub fn new() -> Self {
+    pub fn new(url: String) -> Self {
         ServerReporter {
-            url: "http://localhost:4000".to_owned(),
+            url,
             client: Client::new(),
         }
     }

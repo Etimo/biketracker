@@ -1,5 +1,6 @@
 // Very much based on https://github.com/PistonDevelopers/conrod/blob/master/examples/hello_world.rs
 
+mod config;
 mod event_loop;
 
 use conrod::backend::glium::glium::glutin::dpi::LogicalSize;
@@ -17,16 +18,17 @@ use conrod::{
 
 use event_loop::event_stream;
 
-use futures::future;
 use futures::prelude::*;
 use tokio::runtime::TaskExecutor;
 
-use std::{env, process};
+use std::process;
 
-use failure::{format_err, Error};
+use failure::Error;
 
 use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
 use biketracker_agent::reporter::{self, Reporter};
+
+use self::config::{AgentConfig, BikeConfig, ReporterConfig};
 
 widget_ids! {
     struct Ids {
@@ -65,14 +67,15 @@ enum Page {
 struct State {
     page: Page,
     reporter: Box<dyn Reporter>,
+    config: AgentConfig,
 }
 
 impl State {
-    fn new(bg_executor: TaskExecutor) -> State {
+    fn new(config: AgentConfig, bg_executor: TaskExecutor) -> State {
         State {
             page: Page::Login,
-            // reporter: Box::new(reporter::StdoutReporter::new(bg_executor)),
-            reporter: Box::new(reporter::ServerReporter::new()),
+            reporter: create_reporter(&config.reporter, bg_executor),
+            config,
         }
     }
 }
@@ -82,18 +85,21 @@ fn report_error(state: &mut State, err: Error) {
     state.page = Page::ConnectFailed { err }
 }
 
-fn connect_to_bike() -> Box<dyn Future<Item = BikeMeasurementStream, Error = Error>> {
-    match env::var("BIKETRACKER_BIKE").as_ref().map(|x| &x[..]) {
-        Ok("deskbike") | Err(env::VarError::NotPresent) =>
-            Box::new(measurements_stream(
-                || bike::Deskbike::connect().map_err(|x| x.into()),
-            )),
-        Ok("fake") =>
-            Box::new(measurements_stream(
-                || Ok(bike::FakeBike::default()),
-            )),
-        Ok(x) => Box::new(future::err(format_err!("Unknown bike type {:?} requested, $BIKETRACKER_BIKE should be deskbike (default) or fake", x))),
-        Err(err @ env::VarError::NotUnicode(_)) => Box::new(future::err(err.clone().into())),
+fn connect_to_bike(
+    config: &BikeConfig,
+) -> Box<dyn Future<Item = BikeMeasurementStream, Error = Error>> {
+    match config {
+        BikeConfig::DeskBike => Box::new(measurements_stream(|| {
+            bike::Deskbike::connect().map_err(Error::from)
+        })),
+        BikeConfig::Fake => Box::new(measurements_stream(|| Ok(bike::FakeBike::default()))),
+    }
+}
+
+fn create_reporter(config: &ReporterConfig, bg_executor: TaskExecutor) -> Box<dyn Reporter> {
+    match config {
+        ReporterConfig::Stdout => Box::new(reporter::StdoutReporter::new(bg_executor)),
+        ReporterConfig::Server { url } => Box::new(reporter::ServerReporter::new(url.to_owned())),
     }
 }
 
@@ -169,7 +175,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                     .was_clicked()
                 {
                     state.page = Page::Connecting {
-                        future_bike: connect_to_bike(),
+                        future_bike: connect_to_bike(&state.config.bike),
                         username: CYCLISTS[item.i].to_owned(),
                     };
 
@@ -243,6 +249,8 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
 }
 
 fn main() {
+    let config = AgentConfig::load().unwrap();
+
     let (width, height) = (320.0, 240.0);
 
     let events_loop = EventsLoop::new();
@@ -266,7 +274,7 @@ fn main() {
 
     let bg_runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mut state = State::new(bg_runtime.executor());
+    let mut state = State::new(config, bg_runtime.executor());
     let main_loop = event_stream(events_loop)
         .take_while(|events| {
             for event in events.iter() {
