@@ -108,10 +108,10 @@ fn connect_to_bike(
     config: &BikeConfig,
 ) -> Box<dyn Future<Item = BikeMeasurementStream, Error = Error>> {
     match config {
-        BikeConfig::DeskBike => Box::new(measurements_stream(|| {
-            bike::Deskbike::connect().map_err(Error::from)
+        BikeConfig::DeskBike => Box::new(measurements_stream(|canceled| {
+            bike::Deskbike::connect_or_cancel(canceled).map_err(Error::from)
         })),
-        BikeConfig::Fake => Box::new(measurements_stream(|| Ok(bike::FakeBike::default()))),
+        BikeConfig::Fake => Box::new(measurements_stream(|_canceled| Ok(bike::FakeBike::default()))),
     }
 }
 
@@ -216,10 +216,8 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
             let (mut items, scrollbar) = widgets::ScrollByDrag::new(
                 widget::List::flow_down(CYCLISTS.len())
                     .scrollbar_on_top()
-                    // .scrollbar_color(color::WHITE)
                     .item_size(30.0),
             )
-            // .h(150.0)
             .fill(ids.page_canvas)
             .set(ids.login_page_user_list, ui);
             while let Some(item) = items.next(ui) {
@@ -245,6 +243,14 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
+            if widget::Button::new()
+                .label("Cancel")
+                .fill(ids.buttonbar_canvas)
+                .set(ids.connect_failed_page_home, ui)
+                .was_clicked()
+            {
+                state.page = Page::Login;
+            }
         }
         Page::ConnectFailed { err } => {
             widget::Text::new(&format!("Connection failed: {}", err))

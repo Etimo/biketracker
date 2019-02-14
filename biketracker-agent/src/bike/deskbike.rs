@@ -10,6 +10,7 @@ use failure::{Error, Fail};
 use std::error::Error as StdError;
 
 use super::{Bike, BikeMeasurement};
+use super::cancelable::{Cancelable, Canceled, Uncancelable};
 
 /// Wheel circumference in meters
 ///
@@ -76,6 +77,14 @@ pub enum DeskbikeError {
         cause_message
     )]
     InvalidCscMeasurement { cause_message: String },
+    #[fail(display = "action canceled")]
+    ActionCanceled,
+}
+
+impl From<Canceled> for DeskbikeError {
+    fn from(_canceled: Canceled) -> Self {
+        DeskbikeError::ActionCanceled
+    }
 }
 
 fn bt_err(inner: Box<dyn StdError + Send + Sync>) -> DeskbikeError {
@@ -131,6 +140,7 @@ fn find_device<'a, F>(
     session: &'a BluetoothSession,
     adapter: &BluetoothAdapter,
     mut pred: F,
+    cancelable: &mut Cancelable,
 ) -> Result<BluetoothDevice<'a>, DeskbikeError>
 where
     F: FnMut(&BluetoothDevice) -> bool,
@@ -169,6 +179,7 @@ where
                 return Ok(device);
             }
         }
+        cancelable.check_canceled()?;
     }
 }
 
@@ -181,6 +192,13 @@ pub struct Deskbike {
 
 impl Deskbike {
     pub fn connect() -> Result<Deskbike, DeskbikeError> {
+        Self::connect_or_cancel(&mut Uncancelable)
+    }
+
+    pub fn connect_or_cancel(cancelable: &mut Cancelable) -> Result<Deskbike, DeskbikeError> {
+        // NOTE: We can't check cancelable constantly, but at least do it before slow operations, and
+        // within (potentially infinite) loops.
+
         println!("Setting up bluetooth");
         let bt_session = BluetoothSession::create_session(None).map_err(bt_err)?;
         let adapter = BluetoothAdapter::init(&bt_session).map_err(bt_err)?;
@@ -191,7 +209,8 @@ impl Deskbike {
                 .get_alias()
                 .map(|alias| alias.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX))
                 .unwrap_or(false)
-        })?;
+        }, cancelable)?;
+        cancelable.check_canceled()?;
         println!("Connecting to {}...", device.get_alias().map_err(bt_err)?);
         if !device.is_connected().map_err(bt_err)? {
             device.connect(10000).map_err(bt_err)?;
@@ -201,6 +220,7 @@ impl Deskbike {
         }
         println!("Finding characteristic...");
         let csc_service = loop {
+            cancelable.check_canceled()?;
             match bluetooth_get_service_by_uuid(
                 &bt_session,
                 &device,
@@ -221,6 +241,7 @@ impl Deskbike {
         .ok_or(DeskbikeError::NoCscMeasurementCharacteristicOnService {
             service_path: csc_service.get_id(),
         })?;
+        cancelable.check_canceled()?;
         println!("Subscribing...");
         csc_measurement.start_notify().map_err(bt_err)?;
         Ok(Deskbike {
