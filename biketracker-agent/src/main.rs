@@ -2,6 +2,7 @@
 
 mod config;
 mod event_loop;
+mod widgets;
 
 use conrod_core::text::Font;
 use conrod_core::{
@@ -60,7 +61,10 @@ widget_ids! {
 }
 
 // FIXME: Fetch dynamically instead
-static CYCLISTS: [&'static str; 3] = ["Jens", "Erik", "Johan"];
+static CYCLISTS: [&'static str; 23] = [
+    "Jens", "Erik", "Johan", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo",
+    "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo",
+];
 
 enum Page {
     Login,
@@ -209,13 +213,15 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
-            let (mut items, scrollbar) = widget::List::flow_down(CYCLISTS.len())
-                // .h(150.0)
-                .fill(ids.page_canvas)
-                .scrollbar_next_to()
-                .scrollbar_color(color::WHITE)
-                .item_size(30.0)
-                .set(ids.login_page_user_list, ui);
+            let (mut items, scrollbar) = widgets::ScrollByDrag::new(
+                widget::List::flow_down(CYCLISTS.len())
+                    .scrollbar_on_top()
+                    // .scrollbar_color(color::WHITE)
+                    .item_size(30.0),
+            )
+            // .h(150.0)
+            .fill(ids.page_canvas)
+            .set(ids.login_page_user_list, ui);
             while let Some(item) = items.next(ui) {
                 if item
                     .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
@@ -349,6 +355,7 @@ fn main() {
             }
 
             let ui = &mut ui.set_widgets();
+            // dbg!(ui.global_input().events().collect::<Vec<_>>());
             update(&mut state);
             render(&mut state, &ids, ui);
 

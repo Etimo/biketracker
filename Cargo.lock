@@ -102,6 +102,7 @@ dependencies = [
  "blurz 0.4.0 (git+https://github.com/teozkr/blurz?branch=biketracker)",
  "config 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "conrod_core 0.63.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "conrod_derive 0.63.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "conrod_glium 0.63.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "conrod_winit 0.63.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
