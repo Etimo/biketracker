@@ -1,7 +1,7 @@
 // Based on event loop example from https://github.com/PistonDevelopers/conrod/blob/master/examples/support/mod.rs
 
-use conrod::backend::glium::glium::glutin::{Event, EventsLoop};
 use futures::prelude::*;
+use glium::glutin::{Event, EventsLoop};
 use std::time::Duration;
 use tokio::timer::{self, Interval};
 

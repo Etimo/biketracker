@@ -3,18 +3,16 @@
 mod config;
 mod event_loop;
 
-use conrod::backend::glium::glium::glutin::dpi::LogicalSize;
-use conrod::backend::glium::glium::glutin::{
-    ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent,
+use conrod_core::text::Font;
+use conrod_core::{
+    color, image, widget, widget_ids, Colorable, Labelable, Positionable, Sizeable, UiBuilder,
+    UiCell, Widget,
 };
-use conrod::backend::glium::glium::texture::Texture2d;
-use conrod::backend::glium::glium::{Display, Surface};
-use conrod::backend::glium::Renderer;
-use conrod::text::Font;
-use conrod::{
-    image, widget, widget_ids, Colorable, Labelable, Positionable, Sizeable, UiBuilder, UiCell,
-    Widget,
-};
+use conrod_glium::Renderer;
+use glium::glutin::dpi::LogicalSize;
+use glium::glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent};
+use glium::texture::Texture2d;
+use glium::{Display, Surface};
 
 use event_loop::event_stream;
 
@@ -29,6 +27,20 @@ use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMe
 use biketracker_agent::reporter::{self, Reporter};
 
 use self::config::{AgentConfig, BikeConfig, ReporterConfig};
+
+// Glue between the Glium and Winit backends
+// Copied from https://github.com/PistonDevelopers/conrod/blob/1257babfde300d0eb9bbcd67c6e6cbe1d5ccf46a/backends/conrod_glium/examples/support/mod.rs
+pub struct GliumDisplayWinitWrapper {
+    pub inner: glium::Display,
+}
+impl conrod_winit::WinitWindow for GliumDisplayWinitWrapper {
+    fn get_inner_size(&self) -> Option<(u32, u32)> {
+        self.inner.gl_window().get_inner_size().map(Into::into)
+    }
+    fn hidpi_factor(&self) -> f32 {
+        self.inner.gl_window().get_hidpi_factor() as _
+    }
+}
 
 widget_ids! {
     struct Ids {
@@ -164,19 +176,20 @@ trait PositionableSizeableExt {
 
 impl<W: Positionable + Sizeable> PositionableSizeableExt for W {
     fn fill(self, parent: widget::id::Id) -> Self {
-        self
-            .kid_area_wh_of(parent)
-            .middle_of(parent)
+        self.kid_area_wh_of(parent).middle_of(parent)
     }
 }
 
 fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
     widget::Canvas::new()
         .flow_down(&[
-            (ids.header_canvas, widget::Canvas::new().length(40.0).flow_right(&[
-                (ids.page_title_canvas, widget::Canvas::new()),
-                (ids.app_title_canvas, widget::Canvas::new().length(120.0)),
-            ])),
+            (
+                ids.header_canvas,
+                widget::Canvas::new().length(40.0).flow_right(&[
+                    (ids.page_title_canvas, widget::Canvas::new()),
+                    (ids.app_title_canvas, widget::Canvas::new().length(120.0)),
+                ]),
+            ),
             (ids.page_canvas, widget::Canvas::new()),
             (ids.buttonbar_canvas, widget::Canvas::new().length(30.0)),
         ])
@@ -185,7 +198,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
     widget::Text::new("Etimo BikeTracker")
         .fill(ids.app_title_canvas)
         .right_justify()
-        .color(conrod::color::WHITE)
+        .color(color::WHITE)
         .font_size(16)
         .set(ids.app_title, ui);
 
@@ -193,14 +206,14 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         Page::Login => {
             widget::Text::new("Who are you?")
                 .fill(ids.page_title_canvas)
-                .color(conrod::color::WHITE)
+                .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
             let (mut items, scrollbar) = widget::List::flow_down(CYCLISTS.len())
                 // .h(150.0)
                 .fill(ids.page_canvas)
                 .scrollbar_next_to()
-                .scrollbar_color(conrod::color::WHITE)
+                .scrollbar_color(color::WHITE)
                 .item_size(30.0)
                 .set(ids.login_page_user_list, ui);
             while let Some(item) = items.next(ui) {
@@ -223,14 +236,14 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         Page::Connecting { .. } => {
             widget::Text::new("Connecting...")
                 .fill(ids.page_title_canvas)
-                .color(conrod::color::WHITE)
+                .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
         }
         Page::ConnectFailed { err } => {
             widget::Text::new(&format!("Connection failed: {}", err))
                 .fill(ids.page_title_canvas)
-                .color(conrod::color::RED)
+                .color(color::RED)
                 .font_size(32)
                 .set(ids.page_title, ui);
             if widget::Button::new()
@@ -249,7 +262,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         } => {
             widget::Text::new("Connected!")
                 .fill(ids.page_title_canvas)
-                .color(conrod::color::WHITE)
+                .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
 
@@ -257,8 +270,8 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 "Travelled: {:?}m",
                 last_measurement.cumulative_wheel_meters
             ))
-                .fill(ids.page_canvas)
-            .color(conrod::color::WHITE)
+            .fill(ids.page_canvas)
+            .color(color::WHITE)
             .font_size(32)
             .set(ids.cycling_page_distance, ui);
 
@@ -278,7 +291,7 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         Page::Reporting(_) => {
             widget::Text::new("Uploading report...")
                 .fill(ids.page_title_canvas)
-                .color(conrod::color::WHITE)
+                .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
         }
@@ -296,9 +309,11 @@ fn main() {
         .with_title("BikeTracker")
         .with_dimensions(LogicalSize::new(width, height));
     let context = ContextBuilder::new().with_vsync(true);
-    let display = Display::new(window, context, &events_loop).unwrap();
+    let display = GliumDisplayWinitWrapper {
+        inner: Display::new(window, context, &events_loop).unwrap(),
+    };
     let image_map = image::Map::<Texture2d>::new();
-    let mut renderer = Renderer::new(&display).unwrap();
+    let mut renderer = Renderer::new(&display.inner).unwrap();
 
     let mut ui = UiBuilder::new([width as f64, height as f64]).build();
     let ids = Ids::new(ui.widget_id_generator());
@@ -328,7 +343,7 @@ fn main() {
         .for_each(move |events| {
             for event in events {
                 // Use the `winit` backend feature to convert the winit event to a conrod input.
-                if let Some(input) = conrod::backend::winit::convert_event(event, &display) {
+                if let Some(input) = conrod_winit::convert_event(event, &display) {
                     ui.handle_event(input);
                 }
             }
@@ -338,11 +353,13 @@ fn main() {
             render(&mut state, &ids, ui);
 
             if let Some(primitives) = ui.draw_if_changed() {
-                renderer.fill(&display, primitives, &image_map);
-                let mut target = display.draw();
+                renderer.fill(&display.inner, primitives, &image_map);
+                let mut target = display.inner.draw();
                 // target.clear_color(1.0, 1.0, 1.0, 1.0);
                 target.clear_color(0.0, 0.0, 0.0, 1.0);
-                renderer.draw(&display, &mut target, &image_map).unwrap();
+                renderer
+                    .draw(&display.inner, &mut target, &image_map)
+                    .unwrap();
                 target.finish().unwrap();
             }
             Ok(())
