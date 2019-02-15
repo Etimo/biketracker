@@ -1,33 +1,32 @@
 // Very much based on https://github.com/PistonDevelopers/conrod/blob/master/examples/hello_world.rs
 
 mod config;
+mod cyclists;
 mod event_loop;
+mod memo_future;
 mod widgets;
 
+use self::config::{AgentConfig, BikeConfig, ReporterConfig};
+use self::cyclists::{get_cyclists, Cyclist};
+use self::event_loop::event_stream;
+use self::memo_future::MemoFuture;
+use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
+use biketracker_agent::reporter::{self, Reporter};
 use conrod_core::text::Font;
 use conrod_core::{
     color, image, widget, widget_ids, Colorable, Labelable, Positionable, Sizeable, UiBuilder,
     UiCell, Widget,
 };
 use conrod_glium::Renderer;
+use failure::Error;
+use futures::prelude::*;
 use glium::glutin::dpi::LogicalSize;
 use glium::glutin::{ContextBuilder, Event, EventsLoop, WindowBuilder, WindowEvent};
 use glium::texture::Texture2d;
 use glium::{Display, Surface};
-
-use event_loop::event_stream;
-
-use futures::prelude::*;
-use tokio::runtime::TaskExecutor;
-
 use std::process;
-
-use failure::Error;
-
-use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
-use biketracker_agent::reporter::{self, Reporter};
-
-use self::config::{AgentConfig, BikeConfig, ReporterConfig};
+use std::rc::Rc;
+use tokio::runtime::TaskExecutor;
 
 // Glue between the Glium and Winit backends
 // Copied from https://github.com/PistonDevelopers/conrod/blob/1257babfde300d0eb9bbcd67c6e6cbe1d5ccf46a/backends/conrod_glium/examples/support/mod.rs
@@ -54,17 +53,12 @@ widget_ids! {
         app_title,
         page_title,
         login_page_user_list,
+        login_page_user_list_loading,
         connect_failed_page_home,
         cycling_page_distance,
         cycling_page_done,
     }
 }
-
-// FIXME: Fetch dynamically instead
-static CYCLISTS: [&'static str; 23] = [
-    "Jens", "Erik", "Johan", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo",
-    "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo", "foo",
-];
 
 enum Page {
     Login,
@@ -73,7 +67,7 @@ enum Page {
         username: String,
     },
     ConnectFailed {
-        err: Error,
+        err: Rc<Error>,
     },
     Cycling {
         bike: BikeMeasurementStream,
@@ -87,6 +81,7 @@ struct State {
     page: Page,
     reporter: Box<dyn Reporter>,
     config: AgentConfig,
+    cyclists: MemoFuture<Box<dyn Future<Item = Vec<Cyclist>, Error = Error>>>,
 }
 
 impl State {
@@ -95,11 +90,15 @@ impl State {
             page: Page::Login,
             reporter: create_reporter(&config.reporter, bg_executor),
             config,
+            cyclists: MemoFuture::new(Box::new(get_cyclists())),
         }
     }
 }
 
 fn report_error(state: &mut State, err: Error) {
+    report_error_rc(state, Rc::new(err))
+}
+fn report_error_rc(state: &mut State, err: Rc<Error>) {
     println!("{}", err);
     state.page = Page::ConnectFailed { err }
 }
@@ -111,7 +110,9 @@ fn connect_to_bike(
         BikeConfig::DeskBike => Box::new(measurements_stream(|canceled| {
             bike::Deskbike::connect_or_cancel(canceled).map_err(Error::from)
         })),
-        BikeConfig::Fake => Box::new(measurements_stream(|_canceled| Ok(bike::FakeBike::default()))),
+        BikeConfig::Fake => Box::new(measurements_stream(|_canceled| {
+            Ok(bike::FakeBike::default())
+        })),
     }
 }
 
@@ -213,28 +214,35 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .color(color::WHITE)
                 .font_size(32)
                 .set(ids.page_title, ui);
-            let (mut items, scrollbar) = widgets::ScrollByDrag::new(
-                widget::List::flow_down(CYCLISTS.len())
-                    .scrollbar_on_top()
-                    .item_size(30.0),
-            )
-            .fill(ids.page_canvas)
-            .set(ids.login_page_user_list, ui);
-            while let Some(item) = items.next(ui) {
-                if item
-                    .set(widget::Button::new().label(CYCLISTS[item.i]), ui)
-                    .was_clicked()
-                {
-                    state.page = Page::Connecting {
-                        future_bike: connect_to_bike(&state.config.bike),
-                        username: CYCLISTS[item.i].to_owned(),
-                    };
-
-                    println!("{}", CYCLISTS[item.i]);
+            match state.cyclists.poll() {
+                Ok(Async::Ready(cyclists)) => {
+                    let (mut items, scrollbar) = widgets::ScrollByDrag::new(
+                        widget::List::flow_down(cyclists.len())
+                            .scrollbar_on_top()
+                            .item_size(30.0),
+                    )
+                    .fill(ids.page_canvas)
+                    .set(ids.login_page_user_list, ui);
+                    while let Some(item) = items.next(ui) {
+                        if item
+                            .set(widget::Button::new().label(&cyclists[item.i].name), ui)
+                            .was_clicked()
+                        {
+                            state.page = Page::Connecting {
+                                future_bike: connect_to_bike(&state.config.bike),
+                                username: cyclists[item.i].name.to_owned(),
+                            };
+                        }
+                    }
+                    if let Some(scrollbar) = scrollbar {
+                        scrollbar.set(ui);
+                    }
                 }
-            }
-            if let Some(scrollbar) = scrollbar {
-                scrollbar.set(ui);
+                Ok(Async::NotReady) => widget::Text::new("Loading cyclists...")
+                    .color(color::WHITE)
+                    .fill(ids.page_canvas)
+                    .set(ids.login_page_user_list_loading, ui),
+                Err(err) => report_error_rc(state, err),
             }
         }
         Page::Connecting { .. } => {

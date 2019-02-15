@@ -9,8 +9,8 @@ use dbus;
 use failure::{Error, Fail};
 use std::error::Error as StdError;
 
-use super::{Bike, BikeMeasurement};
 use super::cancelable::{Cancelable, Canceled, Uncancelable};
+use super::{Bike, BikeMeasurement};
 
 /// Wheel circumference in meters
 ///
@@ -204,12 +204,17 @@ impl Deskbike {
         let adapter = BluetoothAdapter::init(&bt_session).map_err(bt_err)?;
 
         println!("Scanning");
-        let device = find_device(&bt_session, &adapter, |device| {
-            device
-                .get_alias()
-                .map(|alias| alias.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX))
-                .unwrap_or(false)
-        }, cancelable)?;
+        let device = find_device(
+            &bt_session,
+            &adapter,
+            |device| {
+                device
+                    .get_alias()
+                    .map(|alias| alias.starts_with(DESKBIKE_BLUETOOTH_ALIAS_PREFIX))
+                    .unwrap_or(false)
+            },
+            cancelable,
+        )?;
         cancelable.check_canceled()?;
         println!("Connecting to {}...", device.get_alias().map_err(bt_err)?);
         if !device.is_connected().map_err(bt_err)? {

@@ -1,10 +1,10 @@
+pub mod cancelable;
 pub mod deskbike;
 pub mod fake;
-pub mod cancelable;
 
+use cancelable::Cancelable;
 pub use deskbike::Deskbike;
 pub use fake::FakeBike;
-use cancelable::Cancelable;
 
 use failure::Error;
 use futures::prelude::*;
@@ -39,7 +39,10 @@ pub trait Bike {
 pub type BikeMeasurementStream = Box<dyn Stream<Item = BikeMeasurement, Error = Error>>;
 
 /// Spawns the bike on its own dedicated thread.
-pub fn measurements_stream<I: Bike, F: FnOnce(&mut dyn Cancelable) -> Result<I, Error> + Send + 'static>(
+pub fn measurements_stream<
+    I: Bike,
+    F: FnOnce(&mut dyn Cancelable) -> Result<I, Error> + Send + 'static,
+>(
     connect: F,
 ) -> impl Future<Item = BikeMeasurementStream, Error = Error> {
     let (mut connected_write, connected_read) = oneshot::channel::<Result<_, Error>>();
