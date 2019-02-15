@@ -38,3 +38,43 @@ impl<F: Future> Future for MemoFuture<F> {
         }
     }
 }
+
+// A future that retries if polled again after a failure.
+pub struct RetryFuture<F: Future, B: FnMut() -> F> {
+    builder: B,
+    future: Option<F>,
+}
+
+impl<F: Future, B: FnMut() -> F> RetryFuture<F, B> {
+    pub fn new(builder: B) -> Self {
+        RetryFuture {
+            builder,
+            future: None,
+        }
+    }
+
+    fn mut_future(&mut self) -> &mut F {
+        if let Some(ref mut fut) = self.future {
+            fut
+        } else {
+            self.future = Some((self.builder)());
+            self.future.as_mut().unwrap()
+        }
+    }
+}
+
+impl<F: Future, B: FnMut() -> F> Future for RetryFuture<F, B> {
+    type Item = F::Item;
+    type Error = F::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        match self.mut_future().poll() {
+            Ok(Async::Ready(value)) => Ok(Async::Ready(value)),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(err) => {
+                self.future = None;
+                Err(err)
+            }
+        }
+    }
+}

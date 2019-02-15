@@ -9,7 +9,7 @@ mod widgets;
 use self::config::{AgentConfig, BikeConfig, ReporterConfig};
 use self::cyclists::{get_cyclists, Cyclist};
 use self::event_loop::event_stream;
-use self::memo_future::MemoFuture;
+use self::memo_future::{MemoFuture, RetryFuture};
 use biketracker_agent::bike::{self, measurements_stream, BikeMeasurement, BikeMeasurementStream};
 use biketracker_agent::reporter::{self, Reporter};
 use conrod_core::text::Font;
@@ -81,7 +81,7 @@ struct State {
     page: Page,
     reporter: Box<dyn Reporter>,
     config: AgentConfig,
-    cyclists: MemoFuture<Box<dyn Future<Item = Vec<Cyclist>, Error = Error>>>,
+    cyclists: Box<dyn Future<Item = Rc<Vec<Cyclist>>, Error = Rc<Error>>>,
 }
 
 impl State {
@@ -90,7 +90,7 @@ impl State {
             page: Page::Login,
             reporter: create_reporter(&config.reporter, bg_executor),
             config,
-            cyclists: MemoFuture::new(Box::new(get_cyclists())),
+            cyclists: Box::new(RetryFuture::new(|| MemoFuture::new(get_cyclists()))),
         }
     }
 }
