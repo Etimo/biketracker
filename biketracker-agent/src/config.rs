@@ -15,6 +15,7 @@ impl AgentConfig {
             include_str!("../Config.toml"),
             FileFormat::Toml,
         ))?;
+        conf.merge(File::with_name("/etc/biketracker-agent").required(false))?;
         conf.merge(File::with_name("biketracker-agent").required(false))?;
         conf.merge(Environment::with_prefix("biketracker_agent"))?;
         conf.try_into().map_err(Error::from)
