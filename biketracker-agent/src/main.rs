@@ -54,7 +54,9 @@ widget_ids! {
         page_title,
         login_page_user_list,
         login_page_user_list_loading,
-        connect_failed_page_home,
+        connecting_page_home,
+        failed_page_details,
+        failed_page_home,
         cycling_page_distance,
         cycling_page_done,
     }
@@ -66,7 +68,7 @@ enum Page {
         future_bike: Box<dyn Future<Item = BikeMeasurementStream, Error = Error>>,
         username: String,
     },
-    ConnectFailed {
+    Failed {
         err: Rc<Error>,
     },
     Cycling {
@@ -100,7 +102,7 @@ fn report_error(state: &mut State, err: Error) {
 }
 fn report_error_rc(state: &mut State, err: Rc<Error>) {
     println!("{}", err);
-    state.page = Page::ConnectFailed { err }
+    state.page = Page::Failed { err }
 }
 
 fn connect_to_bike(
@@ -142,7 +144,7 @@ fn update(state: &mut State) {
                 report_error(state, err);
             }
         },
-        Page::ConnectFailed { .. } => {}
+        Page::Failed { .. } => {}
         Page::Cycling {
             bike,
             last_measurement,
@@ -254,22 +256,27 @@ fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
             if widget::Button::new()
                 .label("Cancel")
                 .fill(ids.buttonbar_canvas)
-                .set(ids.connect_failed_page_home, ui)
+                .set(ids.connecting_page_home, ui)
                 .was_clicked()
             {
                 state.page = Page::Login;
             }
         }
-        Page::ConnectFailed { err } => {
-            widget::Text::new(&format!("Connection failed: {}", err))
+        Page::Failed { err } => {
+            widget::Text::new("Error")
                 .fill(ids.page_title_canvas)
                 .color(color::RED)
                 .font_size(32)
                 .set(ids.page_title, ui);
+            widget::Text::new(&format!("{}", err))
+                .fill(ids.page_canvas)
+                .color(color::WHITE)
+                .font_size(32)
+                .set(ids.failed_page_details, ui);
             if widget::Button::new()
                 .label("Home")
                 .fill(ids.buttonbar_canvas)
-                .set(ids.connect_failed_page_home, ui)
+                .set(ids.failed_page_home, ui)
                 .was_clicked()
             {
                 state.page = Page::Login;
