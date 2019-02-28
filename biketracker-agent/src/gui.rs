@@ -264,7 +264,7 @@ pub fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 .set(ids.page_title, ui);
 
             widget::Text::new(&format!(
-                "Travelled: {:?}m",
+                "Travelled: {:.0}m",
                 last_measurement.cumulative_wheel_meters
             ))
             .fill(ids.page_canvas)
