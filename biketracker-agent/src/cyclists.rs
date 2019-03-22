@@ -29,9 +29,11 @@ pub fn get_cyclists() -> impl Future<Item = Vec<Cyclist>, Error = Error> {
         .and_then(|mut res| res.json::<HashMap<String, Employee>>())
         .from_err()
         .map(|employees| {
-            employees
+            let mut employees: Vec<Cyclist> = employees
                 .into_iter()
                 .map(|(_username, employee)| employee.into())
-                .collect()
+                .collect();
+            employees.sort_by(|one, two| one.name.cmp(&two.name));
+            employees
         })
 }
