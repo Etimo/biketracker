@@ -69,6 +69,8 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
    #+RESULTS:
    [[file:Architecture.png]]
 
+[[./Architecture.png]]
+
 *** Agent
 
 Connects to the bike, records how far you travel, and transmits it to the [[Server][Server]] once the session is over.
@@ -108,7 +110,7 @@ There is also a fake bike for testing purposes.
 - Boot Raspberry Pi
 - Run the following (on the Pi):
 
-#+begin_src shell-script
+#+begin_src shell-script :exports code
   # Install dependencies
   curl https://sh.rustup.rs -sSf | sh
   pacman -Syu git bluez base-devel
