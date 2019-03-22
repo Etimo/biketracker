@@ -1,6 +1,12 @@
+# This documentation is written in the Org format: https://orgmode.org/
+# Basics: *bold*, ~code~, [[link]]
+
+# You'll need to regenerate the diagrams after editing their source code, you can run all such tasks by performing an export (in Emacs: M-x, org-html-export-to-html)
+# If you don't do this then the rendered diagrams will not be updated, and instead keep showing the old version.
+
 * Biketracker
 
-Track your (desk) bikes!
+Track your (desk) bikes! This program allows you to track how far users bike and show it in a decent HTML widget, ready to embed to your website.
 
 ** Get Started (to develop locally)
 
