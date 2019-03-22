@@ -1,0 +1,19 @@
+
+# Required, do not edit
+database_type = "postgres"
+
+# Required database info
+database_name = "biketracker"
+database_user = "biketracker"
+database_password = "feKui9Be"
+
+# Configurable database info
+database_host = "localhost"         # default "localhost"
+database_port = "5432"              # default "5432"
+migration_location = "migrations"  # default "migrations"
+
+# Extra database connection parameters
+# with the format:
+# [database_params]
+# key = "value"
+[database_params]
