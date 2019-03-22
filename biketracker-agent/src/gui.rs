@@ -79,6 +79,7 @@ fn connect_to_bike(
     config: &BikeConfig,
 ) -> Box<dyn Future<Item = BikeMeasurementStream, Error = Error>> {
     match config {
+        #[cfg(feature = "bluez")]
         BikeConfig::DeskBike => Box::new(measurements_stream(|canceled| {
             bike::Deskbike::connect_or_cancel(canceled).map_err(Error::from)
         })),

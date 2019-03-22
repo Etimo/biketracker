@@ -26,6 +26,7 @@ impl AgentConfig {
 #[serde(tag = "type")]
 pub enum BikeConfig {
     Fake,
+    #[cfg(feature = "bluez")]
     DeskBike,
 }
 

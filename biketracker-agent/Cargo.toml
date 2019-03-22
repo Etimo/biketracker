@@ -4,11 +4,15 @@ version = "0.1.0"
 authors = ["Teo Klestrup Röijezon <teo.roijezon@etimo.se>"]
 edition = "2018"
 
+[features]
+bluez = ["blurz", "dbus"]
+default = ["bluez"]
+
 [dependencies]
 # blurz = "0.4.0"
 # We need the error to be Sync for compatibility with Failure, see szeged/blurz#24
-blurz = { git = "https://github.com/teozkr/blurz", branch = "biketracker" }
-dbus = "0.6.4"
+blurz = { git = "https://github.com/teozkr/blurz", branch = "biketracker", optional = true }
+dbus = { version = "0.6.4", optional = true }
 failure = "0.1.5"
 nom = "4.2.0"
 void = "1.0.2"
