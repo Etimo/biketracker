@@ -1,8 +1,10 @@
 pub mod cancelable;
+#[cfg(feature = "bluez")]
 pub mod deskbike;
 pub mod fake;
 
 use cancelable::Cancelable;
+#[cfg(feature = "bluez")]
 pub use deskbike::Deskbike;
 pub use fake::FakeBike;
 
