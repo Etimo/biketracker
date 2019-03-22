@@ -1,0 +1,143 @@
+* Biketracker
+
+Track your (desk) bikes!
+
+** Get Started (to develop locally)
+
+These instructions should work on Linux/macOS/Windows, but the quality of testing is in roughly that order.
+
+*** Database
+
+- Install Dependencies
+  - Install Rustup (https://rustup.rs/) and PostgreSQL
+  - Install Migrant (~cargo install migrant~)
+- Create database:
+  - ~createuser biketracker --password=feKui9Be~ (example password, use something else in prod)
+  - ~createdb biketracker --owner=biketracker~
+- Apply migrations:
+  - ~pushd biketracker-server && migrant apply --all && popd~
+
+*** Server
+
+- Set up the database (see above)
+- Switch to the server folder:
+  - ~cd biketracker-server~
+- Compile and run:
+  - ~cargo run~
+
+*** Agent
+
+- Set up the Server (see above)
+- Switch to the agent folder:
+  - ~cd biketracker-agent~
+- Compile and run:
+  - ~cargo run~
+
+**** Notes
+
+- macOS/Windows: You'll need to disable Bluetooth support when running the agent, do
+  this by passing the passing cargo run the argument ~--no-default-features~.
+  Then you'll need to use the fake bike by setting ~bike.type~ to ~Fake~ in [[./biketracker-agent/Config.toml]].
+- macOS: Currently the agent only works in Release mode on macOS. Enable this by giving ~cargo run~ the
+  argument ~--release~.
+
+*** Dashboard
+
+- Set up the database (as above)
+- Install [[https://grafana.com/][Grafana]]
+- Create a Datasource that connects to the PostgreSQL in the Grafana GUI
+  - Note: Make sure to create a separate read-only user in prod, rather than reusing the server's user
+- Import [[./grafana-config.json]] in the Grafana GUI
+
+** Architecture
+
+   #+begin_src plantuml :file Architecture.png
+     @startuml
+     rectangle "Agent (Raspbarry Pi)" as Agent
+     rectangle Bike
+     rectangle Server
+     rectangle "Dashboard (Grafana)" as Dashboard
+     database "Database (Postgres)" as Database
+
+     Agent --> Bike : Bluetooth LE (CSC Profile)
+     Agent --> Server : REST API
+     Server --> Database
+     Dashboard --> Database
+     @enduml
+   #+end_src
+
+   #+RESULTS:
+   [[file:Architecture.png]]
+
+*** Agent
+
+Connects to the bike, records how far you travel, and transmits it to the [[Server][Server]] once the session is over.
+Also presents a GUI showing the user how far they've travelled, and which lets them log in/out.
+
+This component should be cross-platform, but Bluetooth functionality only works on Linux.
+
+Located in [[./biketracker-agent]].
+
+*** Server
+
+Listens for the [[Agent][Agent]] asking to record sessions, and saves them to the database.
+
+Located in [[./biketracker-server]].
+
+*** Grafana
+
+Collects statistics from the database, and presents them to the user. Also provides embeddable widgets (to
+show off on the website, for example).
+
+A third party component available at [[https://grafana.com/]]. Our configuration is located in [[./grafana-config.json]].
+
+*** Database
+
+A Postgres database with the data collected from the user. The schema is managed using [[https://github.com/jaemk/migrant][Migrant]].
+
+*** Bike
+
+A bike that supports the Bluetooth LE CSC (Cycling Speed + Cadence) profile. In theory any CSC bike should work
+(if the code is adjusted to connect to it), but we've only tested against a [[https://www.deskbike.com/en/][Deskbike]].
+
+There is also a fake bike for testing purposes.
+
+** Installing an Agent Device
+
+- Install [[https://archlinuxarm.org/][Arch Linux ARM]] to SD card
+- Boot Raspberry Pi
+- Run the following (on the Pi):
+
+#+begin_src shell-script
+  # Install dependencies
+  curl https://sh.rustup.rs -sSf | sh
+  pacman -Syu git bluez base-devel
+
+  # Clone repo
+  git clone https://github.com/etimo/biketracker
+  pushd biketracker
+
+  # Install PiTFT driver
+  pushd pkgbuilds/rpi-fbcp
+  makepkg --install
+  popd
+
+  # Compile Biketracker
+  pushd biketracker-server
+  cargo build --release
+  popd
+
+  popd
+#+end_src
+
+- Set up a systemd unit
+
+(According to memory, some details may be ommitted)
+
+*** Why Arch Linux (rather than Raspbian)
+
+Raspbian 9 (Stretch, the current Stable) only ships BlueZ 5.43, but Blurz only supports 5.44 and newer. Raspbian
+10 (Buster, the current Testing) ships BlueZ 5.50, but also ships an X server that doesn't like to cooperate with
+the PiTFT.
+
+Arch supports both BlueZ 5.50 and a working X server.
