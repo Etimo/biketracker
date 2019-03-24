@@ -4,15 +4,15 @@
 # You'll need to regenerate the diagrams after editing their source code, you can run all such tasks by performing an export (in Emacs: M-x, org-html-export-to-html)
 # If you don't do this then the rendered diagrams will not be updated, and instead keep showing the old version.
 
-* Biketracker
+#+Title: Biketracker
 
 Track your (desk) bikes! This program allows you to track how far users bike and show it in a decent HTML widget, ready to embed to your website.
 
-** Get Started (to develop locally)
+* Get Started (to develop locally)
 
 These instructions should work on Linux/macOS/Windows, but the quality of testing is in roughly that order.
 
-*** Database
+** Database
 
 - Install Dependencies
   - Install Rustup (https://rustup.rs/) and PostgreSQL
@@ -23,7 +23,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 - Apply migrations:
   - ~pushd biketracker-server && migrant apply --all && popd~
 
-*** Server
+** Server
 
 - Set up the database (see above)
 - Switch to the server folder:
@@ -31,7 +31,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 - Compile and run:
   - ~cargo run~
 
-*** Agent
+** Agent
 
 - Set up the Server (see above)
 - Switch to the agent folder:
@@ -39,7 +39,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 - Compile and run:
   - ~cargo run~
 
-**** Notes
+*** Notes
 
 - macOS/Windows: You'll need to disable Bluetooth support when running the agent, do
   this by passing the passing cargo run the argument ~--no-default-features~.
@@ -47,7 +47,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 - macOS: Currently the agent only works in Release mode on macOS. Enable this by giving ~cargo run~ the
   argument ~--release~.
 
-*** Dashboard
+** Dashboard
 
 - Set up the database (as above)
 - Install [[https://grafana.com/][Grafana]]
@@ -55,7 +55,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
   - Note: Make sure to create a separate read-only user in prod, rather than reusing the server's user
 - Import [[./grafana-config.json]] in the Grafana GUI
 
-** Architecture
+* Architecture
 
    #+begin_src plantuml :file Architecture.png
      @startuml
@@ -77,7 +77,7 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 
 [[./Architecture.png]]
 
-*** Agent
+** Agent
 
 Connects to the bike, records how far you travel, and transmits it to the [[Server][Server]] once the session is over.
 Also presents a GUI showing the user how far they've travelled, and which lets them log in/out.
@@ -86,31 +86,31 @@ This component should be cross-platform, but Bluetooth functionality only works 
 
 Located in [[./biketracker-agent]].
 
-*** Server
+** Server
 
 Listens for the [[Agent][Agent]] asking to record sessions, and saves them to the database.
 
 Located in [[./biketracker-server]].
 
-*** Grafana
+** Grafana
 
 Collects statistics from the database, and presents them to the user. Also provides embeddable widgets (to
 show off on the website, for example).
 
 A third party component available at [[https://grafana.com/]]. Our configuration is located in [[./grafana-config.json]].
 
-*** Database
+** Database
 
 A Postgres database with the data collected from the user. The schema is managed using [[https://github.com/jaemk/migrant][Migrant]].
 
-*** Bike
+** Bike
 
 A bike that supports the Bluetooth LE CSC (Cycling Speed + Cadence) profile. In theory any CSC bike should work
 (if the code is adjusted to connect to it), but we've only tested against a [[https://www.deskbike.com/en/][Deskbike]].
 
 There is also a fake bike for testing purposes.
 
-** Installing an Agent Device
+* Installing an Agent Device
 
 - Install [[https://archlinuxarm.org/][Arch Linux ARM]] to SD card
 - Boot Raspberry Pi
@@ -142,7 +142,7 @@ There is also a fake bike for testing purposes.
 
 (According to memory, some details may be ommitted)
 
-*** Why Arch Linux (rather than Raspbian)
+** Why Arch Linux (rather than Raspbian)
 
 Raspbian 9 (Stretch, the current Stable) only ships BlueZ 5.43, but Blurz only supports 5.44 and newer. Raspbian
 10 (Buster, the current Testing) ships BlueZ 5.50, but also ships an X server that doesn't like to cooperate with
