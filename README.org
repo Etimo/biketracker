@@ -5,7 +5,7 @@
 # If you don't do this then the rendered diagrams will not be updated, and instead keep showing the old version.
 
 #+Title: Biketracker
-#+OPTIONS: toc
+#+OPTIONS: toc:2
 
 Track your (desk) bikes! This program allows you to track how far users bike and show it in a decent HTML widget, ready to embed to your website.
 
