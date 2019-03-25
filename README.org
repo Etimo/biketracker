@@ -7,13 +7,12 @@
 # If you don't do this then the rendered diagrams will not be updated, and instead keep showing the old version.
 
 #+Title: Biketracker
-# Disable Org's built-in TOC since we generate one using [[https://github.com/snosov1/toc-org][toc-org]] instead (for GitHub compatibility).
-#+OPTIONS: toc:nil
 
 Track your (desk) bikes! This program allows you to track how far users bike and show it in a decent HTML widget, ready to embed to your website.
 
 # Kept up-to-date by [[https://github.com/snosov1/toc-org][toc-org]].
-* Table of Contents                                                   :TOC_3_gh:QUOTE:
+# Ignored for local exports, since real (Emacs) Org provides its own table of contents.
+* Table of Contents                                                   :TOC_3_gh:QUOTE:noexport:
 #+BEGIN_QUOTE
 - [[#get-started-to-develop-locally][Get Started (to develop locally)]]
   - [[#database][Database]]
