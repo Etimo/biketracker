@@ -1,12 +1,35 @@
 # This documentation is written in the Org format: https://orgmode.org/
 # Basics: *bold*, ~code~, [[link]]
 
+# The table of contents is automatically updated by [[https://github.com/snosov1/toc-org][toc-org]] after each save, if you have it installed and enabled.
+
 # You'll need to regenerate the diagrams after editing their source code, you can run all such tasks by performing an export (in Emacs: M-x, org-html-export-to-html)
 # If you don't do this then the rendered diagrams will not be updated, and instead keep showing the old version.
 
 #+Title: Biketracker
+# Disable Org's built-in TOC since we generate one using [[https://github.com/snosov1/toc-org][toc-org]] instead (for GitHub compatibility).
+#+OPTIONS: toc:nil
 
 Track your (desk) bikes! This program allows you to track how far users bike and show it in a decent HTML widget, ready to embed to your website.
+
+# Kept up-to-date by [[https://github.com/snosov1/toc-org][toc-org]].
+* Table of Contents                                                   :TOC_3_gh:QUOTE:
+#+BEGIN_QUOTE
+- [[#get-started-to-develop-locally][Get Started (to develop locally)]]
+  - [[#database][Database]]
+  - [[#server][Server]]
+  - [[#agent][Agent]]
+    - [[#notes][Notes]]
+  - [[#dashboard][Dashboard]]
+- [[#architecture][Architecture]]
+  - [[#agent-1][Agent]]
+  - [[#server-1][Server]]
+  - [[#grafana][Grafana]]
+  - [[#database-1][Database]]
+  - [[#bike][Bike]]
+- [[#installing-an-agent-device][Installing an Agent Device]]
+  - [[#why-arch-linux-rather-than-raspbian][Why Arch Linux (rather than Raspbian)]]
+#+END_QUOTE
 
 * Get Started (to develop locally)
 
