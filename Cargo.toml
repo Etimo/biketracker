@@ -4,3 +4,9 @@ members = [
     "biketracker-agent",
     "biketracker-server"
 ]
+
+[patch.crates-io]
+derive_state_machine_future = { git = "https://github.com/teozkr/state_machine_future", branch = "fix-proc-macro-tag" }
+# Not patched, but they depend on derive_state_machine_future, and Carnix breaks if patched dependencies have unpatched dependees
+state_machine_future = { git = "https://github.com/fitzgen/state_machine_future", tag = "v0.2.0" }
+tokio-postgres = { git = "https://github.com/sfackler/rust-postgres", tag = "tokio-postgres-v0.4.0-rc.2" }
