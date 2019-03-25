@@ -1,0 +1,8 @@
+FROM rust:1.33 as build
+
+WORKDIR /usr/src/biketracker
+COPY . .
+RUN cargo build --release --bin biketracker-server --locked
+
+RUN cargo install --frozen --path biketracker-server
+ENTRYPOINT /usr/local/cargo/bin/biketracker-server
