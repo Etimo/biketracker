@@ -25,7 +25,16 @@ impl ServerConfig {
 
 #[derive(Deserialize, Clone)]
 pub struct DatabaseConfig {
-    pub url: String,
+    pub host: String,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl DatabaseConfig {
+    pub fn url(&self) -> String {
+        format!("postgres://{}:{}@{}/{}", self.username, self.password, self.host, self.database)
+    }
 }
 
 #[derive(Deserialize, Clone)]

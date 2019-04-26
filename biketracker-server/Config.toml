@@ -1,5 +1,8 @@
 [db]
-url = "postgres://biketracker:feKui9Be@localhost/biketracker"
+host = "localhost"
+database = "biketracker"
+username = "biketracker"
+password = "feKui9Be"
 
 [listen]
 ip = "0.0.0.0"

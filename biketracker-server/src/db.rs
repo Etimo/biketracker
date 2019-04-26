@@ -7,7 +7,7 @@ use tokio_postgres::{Client, NoTls};
 
 pub fn connect(config: &DatabaseConfig) -> impl Future<Item = Client, Error = Error> {
     // FIXME: Move to config
-    tokio_postgres::connect(&config.url, NoTls)
+    tokio_postgres::connect(&config.url(), NoTls)
         .map(|(client, conn)| {
             hyper::rt::spawn(conn.map_err(|err| Err(err).unwrap()));
             client

@@ -1,0 +1,3 @@
+charts/etimo-slack-scraper/values.yaml filter=git-crypt diff=git-crypt
+deploy/kubeconfig filter=git-crypt diff=git-crypt
+deploy/registry-keys/client.key filter=git-crypt diff=git-crypt
