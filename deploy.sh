@@ -17,7 +17,7 @@ kubectl get secret/tiller-secret --output=go-template='{{index .data "ca.crt"}}'
 kubectl get secret/tiller-secret --output=go-template='{{index .data "tls.crt"}}' | base64 -d > $HELM_TLS_CERT
 kubectl get secret/tiller-secret --output=go-template='{{index .data "tls.key"}}' | base64 -d > $HELM_TLS_KEY
 
-sbt docker:publish kubernetesHelmImageValues
-docker build -f Dockerfile.server -t $docker_tag
+docker build . -f Dockerfile.server -t $docker_tag
+docker push $docker_tag
 helm init --client-only
-helm upgrade slack-scraper charts/etimo-slack-scraper --install --namespace biketracker --set-string image=$docker_tag
+helm upgrade biketracker charts/biketracker --install --namespace biketracker --set-string image=$docker_tag

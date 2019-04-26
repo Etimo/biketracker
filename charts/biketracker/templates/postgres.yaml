@@ -1,0 +1,16 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: {{ include "biketracker.fullname" . }}-db
+spec:
+  teamId: {{ include "biketracker.fullname" . }}
+  volume:
+    size: 5Gi
+  numberOfInstances: 2
+  users:
+    # database owner
+    biketracker: []
+  databases:
+    biketracker: biketracker
+  postgresql:
+    version: "10"

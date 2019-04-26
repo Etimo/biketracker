@@ -1,0 +1,45 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ include "biketracker.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "biketracker.name" . }}
+    helm.sh/chart: {{ include "biketracker.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "biketracker.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: biketracker
+        image: {{ .Values.image }}
+        env:
+        - name: BIKETRACKER_SERVER_Db.Host
+          value: {{ include "biketracker.fullname" . }}-db
+        - name: BIKETRACKER_SERVER_Db.Database
+          value: biketracker
+        - name: BIKETRACKER_SERVER_Db.Username
+          valueFrom:
+            secretKeyRef:
+              name: biketracker.{{ include "biketracker.fullname" . }}-db.credentials
+              key: username
+        - name: BIKETRACKER_SERVER_Db.Password
+          valueFrom:
+            secretKeyRef:
+              name: biketracker.{{ include "biketracker.fullname" . }}-db.credentials
+              key: password
+        ports:
+        - containerPort: 4000
+          name: http
+      #   volumeMounts:
+      #   - name: blog
+      #     mountPath: /blog
+      # volumes:
+      # - name: config
+      #   secret:
+      #     secretName: {{ include "biketracker.fullname" . }}-config
