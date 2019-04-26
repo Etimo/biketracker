@@ -15,9 +15,30 @@ spec:
         app.kubernetes.io/name: {{ include "biketracker.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      initContainers:
+      - name: migrant
+        image: {{ .Values.images.migrant }}
+        args:
+        - apply
+        - --all
+        env:
+        - name: BIKETRACKER_SERVER_Db.Host
+          value: {{ include "biketracker.fullname" . }}-db
+        - name: BIKETRACKER_SERVER_Db.Database
+          value: biketracker
+        - name: BIKETRACKER_SERVER_Db.Username
+          valueFrom:
+            secretKeyRef:
+              name: biketracker.{{ include "biketracker.fullname" . }}-db.credentials
+              key: username
+        - name: BIKETRACKER_SERVER_Db.Password
+          valueFrom:
+            secretKeyRef:
+              name: biketracker.{{ include "biketracker.fullname" . }}-db.credentials
+              key: password
       containers:
       - name: biketracker
-        image: {{ .Values.image }}
+        image: {{ .Values.images.server }}
         env:
         - name: BIKETRACKER_SERVER_Db.Host
           value: {{ include "biketracker.fullname" . }}-db
@@ -36,10 +57,3 @@ spec:
         ports:
         - containerPort: 4000
           name: http
-      #   volumeMounts:
-      #   - name: blog
-      #     mountPath: /blog
-      # volumes:
-      # - name: config
-      #   secret:
-      #     secretName: {{ include "biketracker.fullname" . }}-config

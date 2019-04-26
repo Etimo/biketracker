@@ -1,0 +1,18 @@
+# Required, do not edit
+database_type = "postgres"
+
+# Required database info
+database_name = "env:BIKETRACKER_SERVER_Db.Database"
+database_user = "env:BIKETRACKER_SERVER_Db.Username"
+database_password = "env:BIKETRACKER_SERVER_Db.Password"
+
+# Configurable database info
+database_host = "env:BIKETRACKER_SERVER_Db.Host"         # default "localhost"
+database_port = "5432"              # default "5432"
+migration_location = "migrations"  # default "migrations"
+
+# Extra database connection parameters
+# with the format:
+# [database_params]
+# key = "value"
+[database_params]
