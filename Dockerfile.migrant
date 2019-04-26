@@ -1,0 +1,12 @@
+FROM rust:1.34.1 as cargo-build
+RUN apt-get update
+RUN apt-get install musl-tools -y
+RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo install migrant --version=0.12.0 --features=postgres --target=x86_64-unknown-linux-musl
+
+FROM alpine:latest
+COPY --from=cargo-build /usr/local/cargo/bin/migrant /bin/migrant
+WORKDIR /etc/migrant
+COPY biketracker-server/Migrant-env.toml ./Migrant.toml
+COPY biketracker-server/migrations ./migrations
+ENTRYPOINT ["migrant"]
