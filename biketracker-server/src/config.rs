@@ -33,7 +33,10 @@ pub struct DatabaseConfig {
 
 impl DatabaseConfig {
     pub fn url(&self) -> String {
-        format!("postgres://{}:{}@{}/{}", self.username, self.password, self.host, self.database)
+        format!(
+            "postgres://{}:{}@{}/{}",
+            self.username, self.password, self.host, self.database
+        )
     }
 }
 

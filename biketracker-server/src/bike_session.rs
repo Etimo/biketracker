@@ -14,7 +14,7 @@ pub fn add_bike_session(
     session: NewBikeSession,
     config: ServerConfig,
 ) -> impl Future<Item = (), Error = Error> {
-    crate::db::connect(&config.db).and_then(|mut db| {
+    crate::db::connect(config.db.clone()).and_then(|mut db| {
         db.prepare("INSERT INTO bike_sessions (id, finished_at, session_meters, username) VALUES ($1, $2, $3, $4)")
             .and_then(move |stmt| {
                 println!("Saving bike session {:?}", &session);
