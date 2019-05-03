@@ -7,6 +7,7 @@ before_install:
 - nix-env -iA nixpkgs.kubectl nixpkgs.kubernetes-helm nixpkgs.git-crypt nixpkgs.skopeo --max-jobs 32
 - openssl aes-256-cbc -K $encrypted_e68af099b11c_key -iv $encrypted_e68af099b11c_iv -in deploy/git-crypt.key.enc -out deploy/git-crypt.key -d
 - git crypt unlock deploy/git-crypt.key
+- sudo apt-get install --yes libdbus-1-dev
 deploy:
   provider: script
   script: bash deploy.sh
