@@ -18,6 +18,7 @@ kubectl get secret/tiller-secret --output=go-template='{{index .data "tls.crt"}}
 kubectl get secret/tiller-secret --output=go-template='{{index .data "tls.key"}}' | base64 -d > $HELM_TLS_KEY
 
 docker build . -f Dockerfile.server -t $docker_tag
+skopeo copy --dest-cert-dir deploy/registry-keys docker-daemon:$docker_tag docker://$docker_tag
 docker push $docker_tag
 helm init --client-only
 helm upgrade biketracker charts/biketracker --install --namespace biketracker --set-string image=$docker_tag
