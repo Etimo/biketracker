@@ -10,6 +10,7 @@ spec:
   users:
     # database owner
     biketracker: []
+    biketracker_viewer: []
   databases:
     biketracker: biketracker
   postgresql:
