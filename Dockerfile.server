@@ -4,16 +4,20 @@ FROM rust:1.34.1 as cargo-build
 RUN apt-get update
 RUN apt-get install musl-tools -y
 RUN rustup target add x86_64-unknown-linux-musl
-WORKDIR /usr/src/biketracker-server
-COPY biketracker-server/Cargo.toml Cargo.toml
+WORKDIR /usr/src/biketracker
+COPY biketracker-server/Cargo.toml biketracker-server/Cargo.toml
+COPY biketracker-shared/Cargo.toml biketracker-shared/Cargo.toml
+COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
-RUN mkdir src/
-RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
+RUN mkdir biketracker-server/src/
+RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > biketracker-server/src/main.rs
+RUN echo "fn shared() {println!(\"if you see this, the build broke\")}" > biketracker-shared/src/lib.rs
 RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --target=x86_64-unknown-linux-musl
 RUN rm target/x86_64-unknown-linux-musl/release/deps/biketracker_server-*
-COPY biketracker-server .
+COPY biketracker-shared biketracker-shared
+COPY biketracker-server biketracker-server
 RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --target=x86_64-unknown-linux-musl
 
 FROM alpine:latest
-COPY --from=cargo-build /usr/src/biketracker-server/target/x86_64-unknown-linux-musl/release/biketracker-server /usr/local/bin/biketracker-server
+COPY --from=cargo-build /usr/src/biketracker/biketracker-server/target/x86_64-unknown-linux-musl/release/biketracker-server /usr/local/bin/biketracker-server
 ENTRYPOINT ["biketracker-server"]
