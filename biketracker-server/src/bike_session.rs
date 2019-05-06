@@ -9,7 +9,7 @@ pub fn add_bike_session(
     config: ServerConfig,
 ) -> impl Future<Item = CreatedBikeSession, Error = Error> {
     crate::db::connect(config.db.clone()).and_then(|mut db| {
-        db.prepare("INSERT INTO bike_sessions (id, finished_at, session_meters, username) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET finished_at=$2, session_meters=$3")
+        db.prepare("INSERT INTO bike_sessions (id, session_meters, username) VALUES ($1, $3, $4) ON CONFLICT (id) DO UPDATE SET finished_at=$2, session_meters=$3")
             .and_then(move |stmt| {
                 let id = session.id.unwrap_or_else(uuid::Uuid::new_v4);
                 println!("Saving bike session {:?} with id {:?}", &session, &id);
