@@ -17,11 +17,11 @@ RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > biketrac
 RUN touch biketracker-shared/src/lib.rs
 RUN touch biketracker-agent/src/main.rs
 RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --bin=biketracker-server --target=x86_64-unknown-linux-musl
-RUN rm target/x86_64-unknown-linux-musl/release/deps/biketracker_server-*
 COPY biketracker-shared biketracker-shared
 COPY biketracker-server biketracker-server
+RUN touch biketracker-shared/src/lib.rs
 RUN RUSTFLAGS=-Clinker=musl-gcc cargo build --release --bin=biketracker-server --target=x86_64-unknown-linux-musl
 
 FROM alpine:latest
-COPY --from=cargo-build /usr/src/biketracker/biketracker-server/target/x86_64-unknown-linux-musl/release/biketracker-server /usr/local/bin/biketracker-server
+COPY --from=cargo-build /usr/src/biketracker/target/x86_64-unknown-linux-musl/release/biketracker-server /usr/local/bin/biketracker-server
 ENTRYPOINT ["biketracker-server"]
