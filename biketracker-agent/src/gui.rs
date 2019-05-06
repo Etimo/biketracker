@@ -50,10 +50,12 @@ enum Page {
     },
     Cycling {
         bike: BikeMeasurementStream,
+        report_future: Option<Box<dyn Future<Item = biketracker_shared::CreatedBikeSession, Error = Error>>>,
+        session_id: Option<uuid::Uuid>,
         last_measurement: BikeMeasurement,
         username: String,
     },
-    Reporting(Box<dyn Future<Item = (), Error = Error>>),
+    Reporting(Box<dyn Future<Item = biketracker_shared::CreatedBikeSession, Error = Error>>),
 }
 
 impl State {
@@ -106,6 +108,8 @@ pub fn update(state: &mut State) {
             Ok(Async::Ready(bike)) => {
                 state.page = Page::Cycling {
                     bike,
+                    report_future: None,
+                    session_id: None,
                     last_measurement: BikeMeasurement::default(),
                     username: username.clone(),
                 }
@@ -118,17 +122,41 @@ pub fn update(state: &mut State) {
         Page::Failed { .. } => {}
         Page::Cycling {
             bike,
+            report_future,
+            session_id,
             last_measurement,
             username,
         } => {
+            if let Some(report_active_future) = report_future {
+                match report_active_future.poll() {
+                    Ok(Async::Ready(session)) => {
+                        *session_id = Some(session.id);
+                        *report_future = None;
+                    },
+                    Ok(Async::NotReady) => {},
+                    Err(err) => {
+                        println!("Failed to log session progress: {:?}", err);
+                        *report_future = None;
+                    }
+                }
+            }
+
             match bike.poll() {
-                Ok(Async::Ready(Some(new_measurement))) => *last_measurement = new_measurement,
+                Ok(Async::Ready(Some(new_measurement))) => {
+                    *last_measurement = new_measurement;
+                    if report_future.is_none() {
+                        *report_future = Some(
+                            state
+                            .reporter
+                            .session_progress(last_measurement, username.clone(), session_id.clone()));
+                    }
+                },
                 // Stream finished
                 Ok(Async::Ready(None)) => {
                     state.page = Page::Reporting(
                         state
                             .reporter
-                            .session_done(last_measurement, username.clone()),
+                            .session_progress(last_measurement, username.clone(), session_id.clone()),
                     )
                 }
                 // No new update
@@ -256,6 +284,7 @@ pub fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
         Page::Cycling {
             last_measurement,
             username,
+            session_id,
             ..
         } => {
             widget::Text::new("Connected!")
@@ -282,7 +311,7 @@ pub fn render(state: &mut State, ids: &Ids, ui: &mut UiCell) {
                 state.page = Page::Reporting(
                     state
                         .reporter
-                        .session_done(last_measurement, username.clone()),
+                        .session_progress(last_measurement, username.clone(), session_id.clone()),
                 );
             }
         }

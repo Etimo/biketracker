@@ -1,26 +1,21 @@
 use super::config::ServerConfig;
 use failure::Error;
 use futures::prelude::*;
-use serde_derive::Deserialize;
+use biketracker_shared::{CreatedBikeSession, NewBikeSession};
 // use tokio_postgres::transaction::Transaction;
-
-#[derive(Deserialize, Debug)]
-pub struct NewBikeSession {
-    session_meters: f64,
-    username: String,
-}
 
 pub fn add_bike_session(
     session: NewBikeSession,
     config: ServerConfig,
-) -> impl Future<Item = (), Error = Error> {
+) -> impl Future<Item = CreatedBikeSession, Error = Error> {
     crate::db::connect(config.db.clone()).and_then(|mut db| {
-        db.prepare("INSERT INTO bike_sessions (id, finished_at, session_meters, username) VALUES ($1, $2, $3, $4)")
+        db.prepare("INSERT INTO bike_sessions (id, finished_at, session_meters, username) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET finished_at=$2, session_meters=$3")
             .and_then(move |stmt| {
-                println!("Saving bike session {:?}", &session);
-                db.execute(&stmt, &[&uuid::Uuid::new_v4(), &chrono::Utc::now(), &session.session_meters, &session.username])
+                let id = session.id.unwrap_or_else(uuid::Uuid::new_v4);
+                println!("Saving bike session {:?} with id {:?}", &session, &id);
+                db.execute(&stmt, &[&id, &chrono::Utc::now(), &session.session_meters, &session.username])
+                    .map(move |_| CreatedBikeSession { id })
             })
             .from_err()
-            .map(|_| ())
     })
 }

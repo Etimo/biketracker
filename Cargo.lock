@@ -99,6 +99,7 @@ dependencies = [
 name = "biketracker-agent"
 version = "0.1.0"
 dependencies = [
+ "biketracker-shared 0.1.0",
  "blurz 0.4.0 (git+https://github.com/teozkr/blurz?branch=biketracker)",
  "config 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "conrod_core 0.63.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -114,6 +115,7 @@ dependencies = [
  "serde 1.0.87 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.87 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -121,6 +123,7 @@ dependencies = [
 name = "biketracker-server"
 version = "0.1.0"
 dependencies = [
+ "biketracker-shared 0.1.0",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "config 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -132,6 +135,15 @@ dependencies = [
  "serde_json 1.0.38 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-postgres 0.4.0-rc.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-postgres-openssl 0.1.0-rc.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "biketracker-shared"
+version = "0.1.0"
+dependencies = [
+ "serde 1.0.87 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.87 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2127,6 +2139,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.87 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

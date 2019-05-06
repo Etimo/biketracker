@@ -2,5 +2,6 @@
 
 members = [
     "biketracker-agent",
-    "biketracker-server"
+    "biketracker-server",
+    "biketracker-shared"
 ]

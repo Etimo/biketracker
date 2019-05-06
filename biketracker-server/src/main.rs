@@ -65,13 +65,14 @@ fn handle_post_bike_session(
     req: Request<Body>,
     config: ServerConfig,
 ) -> impl Future<Item = Response<Body>, Error = ReqError> + Send {
-    deserialize_json_body::<bike_session::NewBikeSession>(req)
+    deserialize_json_body::<biketracker_shared::NewBikeSession>(req)
         .and_then(|session| {
             bike_session::add_bike_session(session, config).map_err(ReqError::internal)
         })
-        .and_then(|()| {
+        .and_then(|session| {
             Response::builder()
-                .body(Body::from("OK"))
+                .header(hyper::header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&session).unwrap()))
                 .map_err(ReqError::internal)
         })
 }

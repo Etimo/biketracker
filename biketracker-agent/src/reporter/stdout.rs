@@ -5,6 +5,7 @@ use failure::Error;
 use futures::prelude::Future;
 use tokio::io::{stdout, write_all};
 use tokio::runtime::TaskExecutor;
+use biketracker_shared::CreatedBikeSession;
 
 pub struct StdoutReporter {
     // FS operations are only permitted on the multithreaded TaskExecutor,
@@ -20,18 +21,19 @@ impl StdoutReporter {
 }
 
 impl Reporter for StdoutReporter {
-    fn session_done(
+    fn session_progress(
         &mut self,
         final_measurement: &BikeMeasurement,
         username: String,
-    ) -> Box<dyn Future<Item = (), Error = Error>> {
+        session_id: Option<uuid::Uuid>,
+    ) -> Box<dyn Future<Item = CreatedBikeSession, Error = Error>> {
         let msg = format!(
-            "Session finished: {} cycled {} meters\r\n",
-            username, final_measurement.cumulative_wheel_meters
+            "Session progress: {} cycled {} meters in session {:?}\r\n",
+            username, final_measurement.cumulative_wheel_meters, session_id
         );
         Box::new(futures::sync::oneshot::spawn(
             write_all(stdout(), msg.into_bytes()).then(|res| match res {
-                Ok(_) => Ok(()),
+                Ok(_) => Ok(CreatedBikeSession { id: uuid::Uuid::new_v4() }),
                 Err(err) => Err(Error::from_boxed_compat(Box::new(err))),
             }),
             &self.executor,

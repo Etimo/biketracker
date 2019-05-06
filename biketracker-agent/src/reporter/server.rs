@@ -7,6 +7,7 @@ use futures::prelude::*;
 use reqwest::r#async::Client;
 use reqwest::StatusCode;
 use serde_derive::Serialize;
+use biketracker_shared::{NewBikeSession, CreatedBikeSession};
 
 pub struct ServerReporter {
     url: String,
@@ -22,30 +23,26 @@ impl ServerReporter {
     }
 }
 
-#[derive(Serialize)]
-struct NewBikeSession {
-    session_meters: f64,
-    username: String,
-}
-
 impl Reporter for ServerReporter {
-    fn session_done(
+    fn session_progress(
         &mut self,
         final_measurement: &BikeMeasurement,
         username: String,
-    ) -> Box<dyn Future<Item = (), Error = Error>> {
+        session_id: Option<uuid::Uuid>,
+    ) -> Box<dyn Future<Item = CreatedBikeSession, Error = Error>> {
         Box::new(
             self.client
                 .post(&format!("{}/bike/session", self.url))
                 .json(&NewBikeSession {
+                    id: session_id,
                     session_meters: final_measurement.cumulative_wheel_meters,
                     username,
                 })
                 .send()
                 .from_err()
-                .and_then(|res| {
+                .and_then(|mut res| {
                     if res.status() == StatusCode::OK {
-                        future::Either::A(future::ok(()))
+                        future::Either::A(res.json().from_err())
                     } else {
                         let url = res.url().clone();
                         let status = res.status().clone();

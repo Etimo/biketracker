@@ -8,10 +8,13 @@ use crate::bike::BikeMeasurement;
 use failure::Error;
 use futures::prelude::Future;
 
+use biketracker_shared::CreatedBikeSession;
+
 pub trait Reporter {
-    fn session_done(
+    fn session_progress(
         &mut self,
         final_measurement: &BikeMeasurement,
         username: String,
-    ) -> Box<dyn Future<Item = (), Error = Error>>;
+        session_id: Option<uuid::Uuid>,
+    ) -> Box<dyn Future<Item = CreatedBikeSession, Error = Error>>;
 }

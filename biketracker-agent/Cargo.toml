@@ -27,3 +27,10 @@ conrod_glium = "0.63.0"
 conrod_winit = "0.63.0"
 glium = "0.23.0"
 conrod_derive = "0.63.0"
+
+[dependencies.biketracker-shared]
+path = "../biketracker-shared"
+
+[dependencies.uuid]
+version = "0.7.2"
+features = ["v4", "serde"]
