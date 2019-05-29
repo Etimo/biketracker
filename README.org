@@ -20,9 +20,12 @@ Track your (desk) bikes! This program allows you to track how far users bike and
   - [[#agent][Agent]]
     - [[#notes][Notes]]
   - [[#dashboard][Dashboard]]
+- [[#deploying-to-prod][Deploying To Prod]]
+  - [[#server-1][Server]]
+    - [[#notes-1][Notes]]
 - [[#architecture][Architecture]]
   - [[#agent-1][Agent]]
-  - [[#server-1][Server]]
+  - [[#server-2][Server]]
   - [[#grafana][Grafana]]
   - [[#database-1][Database]]
   - [[#bike][Bike]]
@@ -76,6 +79,17 @@ These instructions should work on Linux/macOS/Windows, but the quality of testin
 - Create a Datasource that connects to the PostgreSQL in the Grafana GUI
   - Note: Make sure to create a separate read-only user in prod, rather than reusing the server's user
 - Import [[./grafana-config.json]] in the Grafana GUI
+
+* Deploying To Prod
+
+** Server
+
+The repository is set up so that Travis automatically deploys whenever a new commit is pushed. You can also
+do it manually by running ~git crypt unlock && ./deploy.sh~.
+
+*** Notes
+
+- Migrations are currently /not/ applied automatically, you will have to do that yourself, with a local copy of Migrant.
 
 * Architecture
 
@@ -141,7 +155,7 @@ There is also a fake bike for testing purposes.
 #+begin_src shell-script :exports code
   # Install dependencies
   curl https://sh.rustup.rs -sSf | sh
-  pacman -Syu git bluez base-devel
+  pacman -Syu git bluez base-devel xf86-video-fbdev lxdm
 
   # Clone repo
   git clone https://github.com/etimo/biketracker
@@ -157,10 +171,17 @@ There is also a fake bike for testing purposes.
   cargo build --release
   popd
 
+  # Configure server URL
+  sudo tee /etc/biketracker-agent.toml <<EOF
+  [reporter]
+  url = "https://biketracker.ingress.kubernetes.etimo.se"
+  EOF
+
   popd
 #+end_src
 
-- Set up a systemd unit
+- Configure LXDM (at ~/etc/lxdm/lxdm.conf~) to autologin as ~alarm~, and set the session to ~/home/alarm/biketracker/target/release/biketracker-agent~
+- Enable LXDM and FBCP by running ~sudo systemctl enable --now lxdm.service fbcp.service~
 
 (According to memory, some details may be ommitted)
 
