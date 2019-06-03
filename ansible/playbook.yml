@@ -35,6 +35,12 @@
     systemd:
       service: sshd
       state: restarted
+  - name: Install Xorg
+    pacman:
+      name:
+      - lxdm
+      # Xorg driver for the Pi's GPU
+      - xf86-video-fbdev
 - hosts: dashboards
   become: true
   tasks:
@@ -49,9 +55,6 @@
     pacman:
       name:
       - chromium
-      - lxdm
-      # Xorg driver for the Pi's GPU
-      - xf86-video-fbdev
       # Simple window manager
       - ratpoison
       # Mouse hider
@@ -64,8 +67,58 @@
       group: root
       mode: '0755'
   - name: Enable LXDM auto-login
+    vars:
+      session: /usr/local/bin/start-dashboard
     template:
-      src: lxdm-dashboard.conf.j2
+      src: lxdm.conf.j2
+      dest: /etc/lxdm/lxdm.conf
+      owner: root
+      group: root
+      mode: '0644'
+  - name: Enable LXDM
+    systemd:
+      service: lxdm
+      enabled: true
+      state: restarted
+- hosts: agents
+  become: true
+  tasks:
+  - name: Install dependencies
+    pacman:
+      name:
+      - base-devel
+      - git
+      - bluez
+      - rust
+- hosts: agents
+  tasks:
+  - name: Clone repository
+    git:
+      repo: https://github.com/etimo/biketracker.git
+      dest: /home/alarm/biketracker
+  - name: Rebuild Agent
+    command:
+      chdir: /home/alarm/biketracker
+      argv:
+      - cargo
+      - build
+      - "--bin=biketracker-agent"
+      - "--release"
+- hosts: agents
+  become: true
+  tasks:
+  - name: Configure Biketracker Agent
+    template:
+      src: biketracker-agent.toml.j2
+      dest: /etc/biketracker-agent.toml
+      owner: root
+      group: root
+      mode: '0644'
+  - name: Enable LXDM auto-login
+    vars:
+      session: /usr/local/bin/start-dashboard
+    template:
+      src: lxdm.conf.j2
       dest: /etc/lxdm/lxdm.conf
       owner: root
       group: root

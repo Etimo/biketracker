@@ -29,7 +29,7 @@ Track your (desk) bikes! This program allows you to track how far users bike and
   - [[#grafana][Grafana]]
   - [[#database-1][Database]]
   - [[#bike][Bike]]
-- [[#installing-an-agent-device][Installing an Agent Device]]
+- [[#installing-devices-agents-and-dashboards][Installing Devices (Agents and Dashboards)]]
   - [[#why-arch-linux-rather-than-raspbian][Why Arch Linux (rather than Raspbian)]]
 #+END_QUOTE
 
@@ -146,44 +146,45 @@ A bike that supports the Bluetooth LE CSC (Cycling Speed + Cadence) profile. In 
 
 There is also a fake bike for testing purposes.
 
-* Installing an Agent Device
+* Installing Devices (Agents and Dashboards)
 
-- Install [[https://archlinuxarm.org/][Arch Linux ARM]] to SD card
-- Boot Raspberry Pi
-- Run the following (on the Pi):
+- For each device:
+  - Install [[https://archlinuxarm.org/][Arch Linux ARM]] to SD card
+  - Boot Raspberry Pi
+  - Connect wired networking (temporarily)
+  - Connect to Wi-Fi and bootstrap:
+
+#+begin_src  shell-script :exports code
+  # Find out the IP address
+  nmap 192.168.1.0/24 -p22 --open
+  # Bootstrap trust by copying your SSH key
+  # The password here will be "alarm"
+  ssh-copy-id alarm@ip.address.from.prev.step
+  # Connect and switch to root
+  ssh alarm@ip.address.from.prev.step
+  # The password here will be "root"
+  su
+  # Switch to Swedish keyboard layout
+  load-keys sv-latin1
+  # Connect to Wi-Fi
+  wifi-menu
+  # Enable Wi-Fi on boot
+  netctl enable wlan0-mirawireless
+  # Find out your Wi-Fi IP address
+  ip address
+#+end_src
+  - Feel free to disconnect wired networking
+
+- Adjust the Ansible Inventory ([[ansible/hosts.ini]])
+- Run the Ansible Playbook: ~ansible-playbook -i ansible/hosts.ini ansible/playbook.yml~
+- For each new Agent:
+  - Install FBCP to enable the Pi-TFT:
 
 #+begin_src shell-script :exports code
-  # Install dependencies
-  curl https://sh.rustup.rs -sSf | sh
-  pacman -Syu git bluez base-devel xf86-video-fbdev lxdm
-
-  # Clone repo
-  git clone https://github.com/etimo/biketracker
-  pushd biketracker
-
-  # Install PiTFT driver
-  pushd pkgbuilds/rpi-fbcp
+  ssh alarm@ip.address.from.before
+  cd ~/biketracker/pkgsbuilds/rpi-fbcp
   makepkg --install
-  popd
-
-  # Compile Biketracker
-  pushd biketracker-server
-  cargo build --release
-  popd
-
-  # Configure server URL
-  sudo tee /etc/biketracker-agent.toml <<EOF
-  [reporter]
-  url = "https://biketracker.ingress.kubernetes.etimo.se"
-  EOF
-
-  popd
 #+end_src
-
-- Configure LXDM (at ~/etc/lxdm/lxdm.conf~) to autologin as ~alarm~, and set the session to ~/home/alarm/biketracker/target/release/biketracker-agent~
-- Enable LXDM and FBCP by running ~sudo systemctl enable --now lxdm.service fbcp.service~
-
-(According to memory, some details may be ommitted)
 
 ** Why Arch Linux (rather than Raspbian)
 
