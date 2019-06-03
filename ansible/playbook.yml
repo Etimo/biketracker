@@ -66,6 +66,13 @@
       owner: root
       group: root
       mode: '0755'
+  - name: Disable monitor power-save
+    template:
+      src: xorg-dpms.conf.j2
+      dest: /etc/X11/xorg.conf.d/10-dpms.conf
+      owner: root
+      group: root
+      mode: '0644'
   - name: Enable LXDM auto-login
     vars:
       session: /usr/local/bin/start-dashboard
