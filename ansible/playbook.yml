@@ -1,0 +1,77 @@
+- hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+  - name: Initialize Pacman Keyring
+    raw: 'pacman-key --init && pacman-key --populate archlinuxarm'
+  - name: Install Python
+    raw: 'pacman -Q python || yes | pacman -Sy python'
+  - name: Upgrade all installed packages
+    pacman:
+      update_cache: true
+      upgrade: true
+- hosts: all
+  tasks:
+  - name: Install SSH keys
+    vars:
+      employees: '{{ lookup("url", "https://raw.githubusercontent.com/Etimo/Etimo/master/employees.json", split_lines=False) }}'
+    template:
+      src: authorized_keys.j2
+      dest: /home/alarm/.ssh/authorized_keys
+      owner: alarm
+      group: alarm
+      mode: '0644'
+- hosts: all
+  become: true
+  tasks:
+  - name: Apply OpenSSH configuration
+    template:
+      src: sshd_config.j2
+      dest: /etc/ssh/sshd_config
+      owner: root
+      group: root
+      mode: '0644'
+  - name: Restart OpenSSH
+    systemd:
+      service: sshd
+      state: restarted
+- hosts: dashboards
+  become: true
+  tasks:
+  - name: Install RasPi config
+    template:
+      src: config.txt.j2
+      dest: /boot/config.txt
+      owner: root
+      group: root
+      mode: '0644'
+  - name: Install Chromium and Xorg dependencies
+    pacman:
+      name:
+      - chromium
+      - lxdm
+      # Xorg driver for the Pi's GPU
+      - xf86-video-fbdev
+      # Simple window manager
+      - ratpoison
+      # Mouse hider
+      - unclutter
+  - name: Install Dashboard session
+    template:
+      src: start-dashboard.j2
+      dest: /usr/local/bin/start-dashboard
+      owner: root
+      group: root
+      mode: '0755'
+  - name: Enable LXDM auto-login
+    template:
+      src: lxdm-dashboard.conf.j2
+      dest: /etc/lxdm/lxdm.conf
+      owner: root
+      group: root
+      mode: '0644'
+  - name: Enable LXDM
+    systemd:
+      service: lxdm
+      enabled: true
+      state: restarted

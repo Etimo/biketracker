@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Start window manager
+ratpoison&
+# Hide mouse
+unclutter -idle 0&
+# Disable screen blanking
+xset -dpms
+xset s noblank
+# Open dashboard
+exec chromium --kiosk 'https://grafana.ingress.kubernetes.etimo.se/d/1XgulLXmz/cycled-distance?orgId=1&kiosk=tv'
